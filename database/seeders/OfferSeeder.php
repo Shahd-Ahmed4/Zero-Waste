@@ -3,8 +3,8 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use App\Models\Branch;
-use App\Models\Offer;
+use App\Models\branch;
+use App\Models\offer;
 use Carbon\Carbon;
 
 class OfferSeeder extends Seeder
@@ -12,7 +12,7 @@ class OfferSeeder extends Seeder
     public function run()
     {
         // بنجيب كل الفروع ومعاها بيانات الـ Vendor عشان نعرف نوع النشاط
-        $branches = Branch::with('vendor')->get();
+        $branches = branch::with('vendor')->get();
 
         // قوالب بيانات واقعية بالإنجليزية مقسمة حسب نوع الـ Vendor
         $content = [
@@ -52,7 +52,7 @@ class OfferSeeder extends Seeder
                 $discountPrice = $originalPrice * (1 - $discountPercentage);
                 $imageUrl = "https://loremflickr.com/600/400/" . $template['keyword'] . "?lock=" . rand(1, 1000);
 
-                Offer::create([
+                offer::create([
                     'branch_id' => $branch->id,
                     'title' => $template['title'],
                     'description' => $template['description'],

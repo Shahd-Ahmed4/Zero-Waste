@@ -3,8 +3,8 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-use App\Models\Branch;
-use App\Models\Order;
+use App\Models\branch;
+use App\Models\order;
 use Illuminate\Database\Seeder;
 use Carbon\Carbon;
 
@@ -13,8 +13,8 @@ class OrderSeeder extends Seeder
     public function run()
     {
         // بنجيب كل المستخدمين اللي دورهم عملاء
-        $customers = \App\Models\Customer::all();        // بنجيب كل الفروع ومعاها الـ vendor بتاعها
-        $branches = Branch::with('vendor')->get();
+        $customers = \App\Models\customer::all();        // بنجيب كل الفروع ومعاها الـ vendor بتاعها
+        $branches = branch::with('vendor')->get();
 
         if ($customers->isEmpty() || $branches->isEmpty()) {
             return;
@@ -29,7 +29,7 @@ class OrderSeeder extends Seeder
             $deliveryFee = ($deliveryType === 'delivery') ? rand(20, 50) : 0;
             $subtotal = rand(150, 1000);
 
-            Order::create([
+            order::create([
                 'customer_id' => $customer->id,
                 'vendor_id' => $branch->vendor_id,
                 'branch_id' => $branch->id,

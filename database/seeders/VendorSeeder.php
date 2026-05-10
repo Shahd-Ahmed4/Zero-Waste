@@ -3,15 +3,15 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use App\Models\Vendor;
+use App\Models\vendor;
 use App\Models\User;
-use App\Models\Admin;
+use App\Models\admin;
 
 class VendorSeeder extends Seeder
 {
     public function run()
     {
-        $admins = Admin::all();
+        $admins = admin::all();
 
         $restaurants = [
             'Grill House',
@@ -64,7 +64,7 @@ class VendorSeeder extends Seeder
                 $logoUrl = "https://loremflickr.com/400/400/grocery,supermarket?lock=" . rand(1, 1000);
             }
 
-            Vendor::create([
+            vendor::create([
                 'user_id' => $user->id,
                 'admin_id' => $admins->random()->id,
                 'business_name' => $name . ' ' . rand(1, 99),

@@ -4,7 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\Vendor;
-use App\Models\Branch;
+use App\Models\branch;
 
 class BranchSeeder extends Seeder
 {
@@ -37,7 +37,7 @@ class BranchSeeder extends Seeder
 
                 $location = $locations[$i - 1] ?? $locations[0];
 
-                Branch::create([
+                branch::create([
                     'vendor_id' => $vendor->id,
                     'branch_name' => $vendor->business_name . ' - ' . $location['name'],
                     'opening_hours' => '08:00 AM - 12:00 AM',
