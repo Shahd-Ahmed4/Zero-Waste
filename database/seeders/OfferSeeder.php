@@ -31,6 +31,7 @@ class OfferSeeder extends Seeder
             ['title' => 'Seasonal Fruit Basket', 'description' => 'Assorted fruits from the fresh section, suitable for immediate consumption.', 'keyword' => 'fruits'],
             ['title' => 'Dairy Products Box', 'description' => 'Includes cheeses and milk nearing their surplus date.', 'keyword' => 'dairy'],
         ],
+        'bakery' => ['Special bread offer', 'Buy 2 get 1 free'], // ضيفي دي
     ];
 
         foreach ($branches as $branch) {
