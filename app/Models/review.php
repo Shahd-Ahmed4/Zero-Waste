@@ -8,7 +8,6 @@ use App\Models\offer;
 
 class review extends Model
 {
-    protected $hidden=['id','customer_id','offer_id'];
     protected $fillable = ['customer_id', 'offer_id', 'rating', 'comment', 'image', 'is_visible'];
     protected $appends = ['image_url'];
 

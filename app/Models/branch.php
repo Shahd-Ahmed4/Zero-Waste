@@ -19,7 +19,7 @@ class branch extends Model
         'long',
         'status'
     ];
-    protected $hidden = ['id','vendor_id', 'created_at', 'updated_at'];
+    protected $hidden = ['created_at', 'updated_at'];
 
     // الفرع يتبع Vendor واحد
     public function vendor()

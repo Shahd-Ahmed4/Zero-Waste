@@ -25,7 +25,7 @@ class offer extends Model
         'expiration_time',
         'status',
     ];
-    protected $hidden = ['id','branch_id', 'created_at', 'updated_at'];
+    protected $hidden = ['created_at', 'updated_at'];
     // السطر ده بيخلي الـ Average Rating يظهر في الـ API أوتوماتيك
     protected $appends = ['average_rating', 'image_url'];
 

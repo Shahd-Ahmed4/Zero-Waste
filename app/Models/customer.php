@@ -10,7 +10,6 @@ use App\Models\order;
 
 class customer extends Model
 {
-    protected $hidden=['id','user_id',"admin_id"];
     protected $fillable = ['user_id', 'admin_id'];
     public function user()
     {

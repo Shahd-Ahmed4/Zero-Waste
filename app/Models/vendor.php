@@ -22,7 +22,7 @@ class vendor extends Model
         'commercial_register',
         'tax_card',
     ];
-    protected $hidden = ['id','user_id','admin_id', 'created_at', 'updated_at'];
+    protected $hidden = ['created_at', 'updated_at'];
     protected function logo(): Attribute
 {
     return Attribute::make(
