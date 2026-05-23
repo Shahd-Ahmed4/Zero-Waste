@@ -26,33 +26,17 @@ class CustomerController extends Controller
             'phone' => 'sometimes|string|max:20',
             'address' => 'sometimes|string|max:500',
             'email' => 'sometimes|email|unique:users,email,' . $user->id,
-            'password' => 'sometimes|string|min:8|confirmed',  // لو عايز يغير الباسورد بالمرة
         ]);
-
-        // 3. تشفير الباسورد لو موجودة في الطلب
-        if (isset($data['password'])) {
-            $data['password'] = Hash::make($data['password']);
-        }
 
         // 4. تحديث جدول الـ users
         $user->update($data);
-        if (isset($data['password'])) {
-            // لو غير الباسورد نبعت إشعار أمني
-            \App\Models\notification::create([
-                'user_id' => $user->id,
-                'message' => "Security Alert: Your password has been changed successfully.",
-                'type' => 'system',
-                'is_read' => 0
-            ]);
-        } else {
-            // لو حدث بيانات عادية
-            \App\Models\notification::create([
-                'user_id' => $user->id,
-                'message' => "Your profile information has been updated successfully.",
-                'type' => 'system',
-                'is_read' => 0
-            ]);
-        }
+
+        \App\Models\notification::create([
+            'user_id' => $user->id,
+            'message' => "Your profile information has been updated successfully.",
+            'type' => 'system',
+            'is_read' => 0
+        ]);
 
         // 5. لو عندك جدول منفصل اسمه customers فيه بيانات تانية (زي نقاط الولاء مثلاً)
         // $user->customer()->update($request->only(['some_other_field']));
@@ -61,6 +45,43 @@ class CustomerController extends Controller
             'status' => 'success',
             'message' => 'Profile updated successfully!',
             'user' => $user->load('customer') // بنرجع البيانات الجديدة مع تفاصيل العميل
+        ], 200);
+    }
+    public function changePassword(Request $request)
+    {
+        // 1. اليوزر اللي عامل Login حالياً
+        $user = $request->user();
+
+        // 2. الـ Validation (التأكد من الباسورد القديمة والجديدة)
+        $request->validate([
+            'current_password' => 'required|string',
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        // 3. التحقق إن الباسورد القديمة اللي كتبها صحيحة ومطابقة للي في الداتابيز
+        if (!Hash::check($request->current_password, $user->password)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'The current password you entered is incorrect.'
+            ], 422); // كود 422 معناه ValidationError
+        }
+
+        // 4. تشفير وتحديث الباسورد الجديدة
+        $user->update([
+            'password' => Hash::make($request->password)
+        ]);
+
+        // 5. إرسال إشعار أمني للمستخدم
+        \App\Models\notification::create([
+            'user_id' => $user->id,
+            'message' => "Security Alert: Your password has been changed successfully.",
+            'type' => 'system',
+            'is_read' => 0
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Password changed successfully!'
         ], 200);
     }
 
