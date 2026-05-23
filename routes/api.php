@@ -106,6 +106,7 @@ Route::middleware(['auth:sanctum', 'checkadmin'])->group(function () {
 
 Route::middleware(['auth:sanctum', 'checkcustomer'])->group(function () {
     Route::put('/customer/profile', [CustomerController::class, 'update']);
+    Route::put('/profile/change-password', [CustomerController::class, 'changePassword']);
     Route::delete('customer/delete-profile', [CustomerController::class, 'destroy']);
     Route::post('/orders', [OrderController::class, 'store']); // إنشاء أوردر    //ana wa2fa hnaa 
     Route::get('/my-orders', [OrderController::class, 'index']); // عرض طلباته هو بس
