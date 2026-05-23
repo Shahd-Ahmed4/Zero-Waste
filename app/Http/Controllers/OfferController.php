@@ -239,7 +239,14 @@ class OfferController extends Controller
     public function show($id)
     {
         // بنجيب العرض مع بيانات الفرع والفيندور اللي فوق الفرع ده
-        $offer = offer::with(['branch.vendor'])->findOrFail($id);
+        $offer = offer::with([
+            'branch' => function ($q) {
+                $q->select('id', 'branch_name', 'store_address', 'lat', 'long', 'vendor_id', 'opening_hours', 'contact_phone');
+            },
+            'branch.vendor' => function ($q) {
+                $q->select('id', 'business_name', 'logo', 'vendor_type');
+            }
+        ])->findOrFail($id);
 
         // الحماية: لو العرض مش active
         // بنشيك لو اليوزر مش أدمن "و" مش هو صاحب الفرع اللي نزل العرض
