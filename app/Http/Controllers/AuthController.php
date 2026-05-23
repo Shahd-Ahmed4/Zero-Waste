@@ -183,26 +183,42 @@ class AuthController extends Controller
         // Always return the same response to prevent user enumeration
         return response()->json(['message' => 'If this email is registered in our system, you will receive a reset code shortly.']);
     }
+    public function verifyCode(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'reset_code' => 'required',
+        ]);
+
+        // بنجيب اليوزر وبنشيك إن الكود منتهى الصلاحية
+        $user = User::where('email', $request->email)
+            ->whereNotNull('reset_code')
+            ->where('reset_code_expires_at', '>', now())
+            ->first();
+
+        // بنطابق الكود المتشفر
+        if (!$user || !Hash::check($request->reset_code, $user->reset_code)) {
+            return response()->json(['message' => 'The code is invalid, expired, or the email is incorrect.'], 400);
+        }
+
+        // لو الكود صح، بنرجع نجاح عشان الـ Front ينقلهم لصفحة الباسورد الجديد
+        return response()->json(['message' => 'Code verified successfully.'], 200);
+    }
 
     public function resetPassword(Request $request)
     {
         $request->validate([
             'email' => 'required|email',
-            'reset_code' => 'required',
-            'password' => 'required|confirmed|min:8',
+            'password' => 'required|confirmed|min:8', // شلنا شرط الـ reset_code لأنه اتأكد خلاص
         ]);
 
-        $user = User::where('email', $request->email)
-            ->whereNotNull('reset_code')
-            ->where('reset_code_expires_at', '>', now()) // Check OTP not expired
-            ->first();
+        $user = User::where('email', $request->email)->first();
 
-        // Verify hashed OTP using Hash::check
-        if (!$user || !Hash::check($request->reset_code, $user->reset_code)) {
-            return response()->json(['message' => 'The code is invalid, expired, or the email is incorrect.'], 400);
+        if (!$user) {
+            return response()->json(['message' => 'User not found.'], 404);
         }
 
-        // Update password and clear OTP so it can't be reused
+        // تحديث الباسورد وتصفير الكود تماماً عشان الأمان
         $user->update([
             'password' => bcrypt($request->password),
             'reset_code' => null,

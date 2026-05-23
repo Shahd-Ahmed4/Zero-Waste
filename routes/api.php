@@ -127,6 +127,7 @@ Route::get('/payment/cancel', [PaymentController::class, 'paymentCancel']);
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+Route::post('/verify-reset-code', [AuthController::class, 'verifyCode']);
 Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 Route::get('/vendors', [VendorController::class, 'index']);  //user ygeb kol el vendors esm we no3 we logo
 Route::get('/branches/nearby', [BranchController::class, 'nearby']); //hygeb el branches el oryben mno 3n tare2 el lat we long
