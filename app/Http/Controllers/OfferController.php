@@ -11,13 +11,14 @@ class OfferController extends Controller
     /**
      * 1. عرض العروض (العملاء والأدمن)
      */
-    public function index(Request $request) // ضيفنا الـ Request هنا
+    public function index(Request $request)
     {
         $user = auth('sanctum')->user();
 
-        // 1. نبدأ بـ Query أساسي عشان نزود عليه الشروط براحتنا
-        $query = offer::query()->with([
+        // 1. نبدأ بـ Query أساسي ونحدد صراحة أننا نريد معرف العرض أولاً لتجنب تضارب الجداول
+        $query = offer::query()->select('offers.*')->with([
             'branch' => function ($q) {
+                // نضمن دائماً وضع الـ id والـ vendor_id لتنجح العلاقة
                 $q->select('id', 'branch_name', 'store_address', 'lat', 'long', 'vendor_id');
             },
             'branch.vendor:id,business_name,logo'
@@ -25,9 +26,8 @@ class OfferController extends Controller
 
         // 2. تصفية للأدمن vs المستخدم العادي
         if ($user && $user->role === 'admin') {
-            // الأدمن يشوف كله، مش هنضيف شروط زيادة هنا
+            // الأدمن يشوف كله
         } else {
-            // المستخدم العادي يشوف الفعال بس
             $query->where('offers.status', 'active')
                 ->where('expiration_time', '>', now());
         }
@@ -50,8 +50,10 @@ class OfferController extends Controller
                     if ($request->filled('lat') && $request->filled('long')) {
                         $lat = $request->lat;
                         $lon = $request->long;
+
+                        // هنا قمنا بحل تضارب الـ id: نختار id العرض صراحة كـ id ونضع الحقول الأخرى
                         $query->join('branches', 'offers.branch_id', '=', 'branches.id')
-                            ->selectRaw("offers.*, (6371 * acos(cos(radians(?)) * cos(radians(branches.lat)) * cos(radians(branches.long) - radians(?)) + sin(radians(?)) * sin(radians(branches.lat)))) AS distance", [$lat, $lon, $lat])
+                            ->selectRaw("offers.*, offers.id AS id, (6371 * acos(cos(radians(?)) * cos(radians(branches.lat)) * cos(radians(branches.long) - radians(?)) + sin(radians(?)) * sin(radians(branches.lat)))) AS distance", [$lat, $lon, $lat])
                             ->orderBy('distance', 'asc');
                     }
                     break;
@@ -61,20 +63,20 @@ class OfferController extends Controller
                     break;
 
                 case 'highest_discount':
-                    $query->selectRaw('*, (original_price - discount_price) as discount_amount')
+                    // نضمن الإبقاء على الـ id الأصلي للعرض هنا أيضاً
+                    $query->selectRaw('offers.*, offers.id AS id, (original_price - discount_price) as discount_amount')
                         ->orderBy('discount_amount', 'desc');
                     break;
 
                 default:
-                    $query->latest();
+                    $query->latest('offers.created_at');
                     break;
             }
         } else {
-            $query->latest();
+            $query->latest('offers.created_at');
         }
 
-        // 5. التنفيذ والـ Return (في الآخر خالص)
-        $data = $query->get(); // أو paginate(10) للأفضل
+        $data = $query->get();
 
         return response()->json([
             'status' => 'success',
@@ -247,7 +249,10 @@ class OfferController extends Controller
             return response()->json(['message' => 'This offer is no longer available'], 410);
         }
 
-        return response()->json($offer);
+        return response()->json([
+            'status' => 'success',
+            'data' => $offer
+        ]);
     }
     public function showVendorOffer($id)
     {
