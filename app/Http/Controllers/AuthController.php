@@ -155,9 +155,28 @@ class AuthController extends Controller
             ]);
 
             // Send email via Mailtrap
-            \Mail::raw("Your password reset code is: $otp", function ($message) use ($user) {
-                $message->to($user->email)->subject('Password Reset Code');
-            });
+            $response = \Illuminate\Support\Facades\Http::withHeaders([
+                'api-key' => env('MAIL_PASSWORD'), // هيقرأ الـ API Key اللي في الـ env
+                'accept' => 'application/json',
+                'content-type' => 'application/json',
+            ])->post('https://api.brevo.com/v3/smtp/email', [
+                        'sender' => [
+                            'name' => env('MAIL_FROM_NAME', 'Zero Waste App'),
+                            'email' => env('MAIL_FROM_ADDRESS')
+                        ],
+                        'to' => [
+                            [
+                                'email' => $request->email,
+                            ]
+                        ],
+                        'subject' => 'Password Reset Code',
+                        'textContent' => "Your password reset code is: {$otp}. It is valid for 10 minutes."
+                    ]);
+
+            // تشيك أمان عشان لو بريفو رفض الطلب لأي سبب نعرف من الـ Logs
+            if ($response->failed()) {
+                \Illuminate\Support\Facades\Log::error('Brevo API Failed: ' . $response->body());
+            }
 
         }
 
