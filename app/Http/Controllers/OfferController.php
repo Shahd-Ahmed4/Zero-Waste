@@ -16,13 +16,14 @@ class OfferController extends Controller
         $user = auth('sanctum')->user();
 
         // 1. نبدأ بـ Query أساسي ونحدد صراحة أننا نريد معرف العرض أولاً لتجنب تضارب الجداول
-        $query = offer::query()->select('offers.*')->with([
-            'branch' => function ($q) {
-                // نضمن دائماً وضع الـ id والـ vendor_id لتنجح العلاقة
-                $q->select('id', 'branch_name', 'store_address', 'lat', 'long', 'vendor_id');
-            },
-            'branch.vendor:id,business_name,logo'
-        ]);
+        $query = offer::query()->select('offers.id', 'offers.title', 'offers.description', 'offers.original_price', 'offers.discount_price', 'offers.expiration_time', 'offers.status', 'offers.branch_id', 'offers.created_at')
+            ->with([
+                'branch' => function ($q) {
+                    // نضمن دائماً وضع الـ id والـ vendor_id لتنجح العلاقة
+                    $q->select('id', 'branch_name', 'store_address', 'lat', 'long', 'vendor_id');
+                },
+                'branch.vendor:id,business_name,logo'
+            ]);
 
         // 2. تصفية للأدمن vs المستخدم العادي
         if ($user && $user->role === 'admin') {
@@ -53,7 +54,7 @@ class OfferController extends Controller
 
                         // هنا قمنا بحل تضارب الـ id: نختار id العرض صراحة كـ id ونضع الحقول الأخرى
                         $query->join('branches', 'offers.branch_id', '=', 'branches.id')
-                            ->selectRaw("offers.*, offers.id AS id, (6371 * acos(cos(radians(?)) * cos(radians(branches.lat)) * cos(radians(branches.long) - radians(?)) + sin(radians(?)) * sin(radians(branches.lat)))) AS distance", [$lat, $lon, $lat])
+                            ->addSelect(\DB::raw("(6371 * acos(cos(radians($lat)) * cos(radians(branches.lat)) * cos(radians(branches.long) - radians($lon)) + sin(radians($lat)) * sin(radians(branches.lat)))) AS distance"))
                             ->orderBy('distance', 'asc');
                     }
                     break;
@@ -64,7 +65,7 @@ class OfferController extends Controller
 
                 case 'highest_discount':
                     // نضمن الإبقاء على الـ id الأصلي للعرض هنا أيضاً
-                    $query->selectRaw('offers.*, offers.id AS id, (original_price - discount_price) as discount_amount')
+                    $query->addSelect(\DB::raw('(original_price - discount_price) as discount_amount'))
                         ->orderBy('discount_amount', 'desc');
                     break;
 
