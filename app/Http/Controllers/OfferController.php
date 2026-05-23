@@ -242,7 +242,7 @@ class OfferController extends Controller
         // بنجيب العرض مع بيانات الفرع والفيندور اللي فوق الفرع ده
         $offer = offer::with([
             'branch' => function ($q) {
-                $q->select('id', 'branch_name', 'store_address', 'lat', 'long', 'vendor_id', 'opening_hours', 'contact_phone');
+                $q->select('id', 'branch_name', 'store_address', 'lat', 'long', 'vendor_id', 'opening_hours', 'contact_phone','contact_email');
             },
             'branch.vendor' => function ($q) {
                 $q->select('id', 'business_name', 'logo', 'vendor_type');
