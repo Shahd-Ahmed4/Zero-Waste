@@ -161,7 +161,7 @@ class AuthController extends Controller
                 'content-type' => 'application/json',
             ])->post('https://api.brevo.com/v3/smtp/email', [
                         'sender' => [
-                            'name' => env('MAIL_FROM_NAME', 'Zero Waste App'),
+                            'name' => 'Zero Waste App',
                             'email' => env('MAIL_FROM_ADDRESS')
                         ],
                         'to' => [
