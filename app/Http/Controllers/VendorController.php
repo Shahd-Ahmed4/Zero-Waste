@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use App\Models\offer;
 use Illuminate\Testing\Fluent\Concerns\Has;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 
 class VendorController extends Controller
 {
@@ -176,7 +177,6 @@ class VendorController extends Controller
         $request->validate([
             'name' => 'sometimes|string|max:255',
             'email' => 'sometimes|email|unique:users,email,' . $user->id,
-            'password' => 'sometimes|nullable|string|min:8|confirmed',
             'phone' => 'sometimes|string|max:20',
             'business_name' => 'sometimes|string|max:255',
             'logo' => 'sometimes|image|mimes:jpeg,png,jpg|max:2048',
@@ -185,9 +185,6 @@ class VendorController extends Controller
             'tax_number' => 'sometimes|nullable|string|max:100'
         ]);
         $userData = $request->only(['name', 'email', 'phone']);
-        if ($request->filled('password')) {
-            $userData['password'] = \Hash::make($request->password);
-        }
         if (!empty($userData)) {
             $user->update($userData);
         }
@@ -216,7 +213,47 @@ class VendorController extends Controller
             'is_read' => 0
         ]);
 
-        return response()->json(['message' => 'Profile updated successfully']);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Profile updated successfully',
+            'user' => $user->load('vendor') // بيرجع البيانات الجديدة للـ Vendor للتأكيد
+        ]);
+    }
+    public function changePassword(Request $request)
+    {
+        $user = $request->user();
+
+        // 1. الـ Validation الخاص بالباسورد للـ Vendor
+        $request->validate([
+            'current_password' => 'required|string',
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        // 2. التحقق إن الباسورد القديمة صحيحة
+        if (!Hash::check($request->current_password, $user->password)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'The current password you entered is incorrect.'
+            ], 422);
+        }
+
+        // 3. تحديث الباسورد
+        $user->update([
+            'password' => Hash::make($request->password)
+        ]);
+
+        // 4. إرسال إشعار للـ Vendor
+        \App\Models\notification::create([
+            'user_id' => $user->id,
+            'message' => "Security Alert: Your vendor account password has been changed successfully.",
+            'type' => 'system',
+            'is_read' => 0
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Vendor password changed successfully!'
+        ], 200);
     }
 
 

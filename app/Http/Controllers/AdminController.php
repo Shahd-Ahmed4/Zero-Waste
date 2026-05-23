@@ -210,38 +210,58 @@ class AdminController extends Controller
             'address' => 'sometimes|string|max:500',
             'email' => 'sometimes|email|unique:users,email,' . $user->id,
             // لو حابة تسمحي بتغيير الباسورد من هنا
-            'password' => 'sometimes|string|min:8|confirmed',
         ]);
-
-        // 2. تشفير الباسورد لو اتبعتت
-        if (isset($data['password'])) {
-            $data['password'] = Hash::make($data['password']);
-        }
-
         // 3. التحديث باستخدام المتغير $data (اللي حصل له Validate) 
         // مش باستخدام $request->all()
         $user->update($data);
-        if (isset($data['password'])) {
-            \App\Models\notification::create([
-                'user_id' => $user->id,
-                'message' => "Security Alert: Admin password was updated. If this wasn't you, check logs immediately.",
-                'type' => 'system',
-                'is_read' => 0
-            ]);
-        } else {
-            \App\Models\notification::create([
-                'user_id' => $user->id,
-                'message' => "Admin profile information has been successfully modified.",
-                'type' => 'system',
-                'is_read' => 0
-            ]);
-        }
+        \App\Models\notification::create([
+            'user_id' => $user->id,
+            'message' => "Admin profile information has been successfully modified.",
+            'type' => 'system',
+            'is_read' => 0
+        ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Profile updated successfully',
             'data' => $user
         ]);
+    }
+    public function changePassword(Request $request)
+    {
+        $user = Auth::user();
+
+        // 1. الـ Validation الخاص بالـ Admin
+        $request->validate([
+            'current_password' => 'required|string',
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        // 2. التحقق من الباسورد القديمة
+        if (!Hash::check($request->current_password, $user->password)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'The current password you entered is incorrect.'
+            ], 422);
+        }
+
+        // 3. تحديث الباسورد المشفرة
+        $user->update([
+            'password' => Hash::make($request->password)
+        ]);
+
+        // 4. إرسال إشعار أمني شديد اللهجة للـ Admin
+        \App\Models\notification::create([
+            'user_id' => $user->id,
+            'message' => "Security Alert: Admin password was updated. If this wasn't you, check logs immediately.",
+            'type' => 'system',
+            'is_read' => 0
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Admin password changed successfully!'
+        ], 200);
     }
 
     /**

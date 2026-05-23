@@ -35,6 +35,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware('vendoractive')->group(function () {
         Route::post('vendor/myprofile/update', [VendorController::class, 'update']);//y3ml update le el basic information
+        Route::put('/vendor/change-password', [VendorController::class, 'changePassword']);
         Route::delete('/vendor/delete-account', [VendorController::class, 'destroy']);
         Route::get('vendor/myoffers', [OfferController::class, 'myOffers']); //yshof el offers bt3to bs
         Route::get('vendor/offers/{id}', [OfferController::class, 'showVendorOffer']); //yshof el offer mo3yn 3ndo 
@@ -78,6 +79,7 @@ Route::middleware(['auth:sanctum', 'checkadmin'])->group(function () {
 
     Route::middleware(['checkadmin:super_admin,manager'])->group(function () {
         Route::put('/profile', [AdminController::class, 'updateProfile']);
+        Route::put('/admin/change-password', [AdminController::class, 'changePassword']);
         Route::get('/admin/vendor/pending', [AdminController::class, 'pendingVendors']);  //yshof el vendors el status bt3ethom pending
         Route::get('/admin/vendor/{id}', [AdminController::class, 'showPendingDocs']); //yshof el docs bta3t el vendor 3shan yt2kd enhom tmamabl ma y3ml approve
         Route::post('/admin/vendor/{id}/accept', [AdminController::class, 'accept']);  //ywaf2 3la vendor
