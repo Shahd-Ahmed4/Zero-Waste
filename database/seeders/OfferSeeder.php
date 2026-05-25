@@ -64,16 +64,16 @@ class OfferSeeder extends Seeder
 
         // مصفوفة الصور المنوعة اللي موجودة عندك في الـ public/uploads
         $images = [
-            'restaurant' => ['uploads/restaurant1.jpg', 'uploads/restaurant2.jpg', 'uploads/restaurant3.jpg', 'uploads/restaurant4.jpg'],
-            'cafe' => ['uploads/cafe1.jpg', 'uploads/cafe2.jpg', 'uploads/cafe3.jpg', 'uploads/cafe4.jpg', 'uploads/cafe5.jpg'],
-            'supermarket' => ['uploads/market1.jpg', 'uploads/market2.jpg', 'uploads/market3.jpg','uploads/market4.jpg', 'uploads/market5.jpg'],
-            'bakery' => ['uploads/cafe1.jpg', 'uploads/cafe2.jpg', 'uploads/cafe3.jpg', 'uploads/cafe4.jpg', 'uploads/cafe5.jpg'], // ✨ كومنت مضاف: ربط صور المخبوزات
-            'hotel' => ['uploads/restaurant1.jpg', 'uploads/restaurant2.jpg', 'uploads/restaurant3.jpg', 'uploads/restaurant4.jpg'], // ✨ كومنت مضاف: ربط صور بوفيه الفنادق
+            'restaurant' => ['uploads/images_GradProj/restaurant1.jpg', 'uploads/images_GradProj/restaurant2.jpg', 'uploads/images_GradProj/restaurant3.jpg', 'uploads/images_GradProj/restaurant4.jpg'],
+            'cafe' => ['uploads/images_GradProj/cafe1.jpg', 'uploads/images_GradProj/cafe2.jpg', 'uploads/images_GradProj/cafe3.jpg', 'uploads/images_GradProj/cafe4.jpg', 'uploads/images_GradProj/cafe5.jpg'],
+            'supermarket' => ['uploads/images_GradProj/market1.jpg', 'uploads/images_GradProj/market2.jpg', 'uploads/images_GradProj/market3.jpg', 'uploads/images_GradProj/market4.jpg', 'uploads/images_GradProj/market5.jpg'],
+            'bakery' => ['uploads/images_GradProj/cafe1.jpg', 'uploads/images_GradProj/cafe2.jpg', 'uploads/images_GradProj/cafe3.jpg', 'uploads/images_GradProj/cafe4.jpg', 'uploads/images_GradProj/cafe5.jpg'],
+            'hotel' => ['uploads/images_GradProj/restaurant1.jpg', 'uploads/images_GradProj/restaurant2.jpg', 'uploads/images_GradProj/restaurant3.jpg', 'uploads/images_GradProj/restaurant4.jpg'],
         ];
 
         // ✨ كومنت مضاف: هنا عدلنا اللوب لتلف 25 لفة بالظبط عشان ننتج 25 عرض فقط في قاعدة البيانات
         for ($i = 0; $i < 25; $i++) {
-            
+
             // بننقي فرع عشوائي من الفروع المتاحة
             $branch = $branches->random();
 
@@ -89,17 +89,21 @@ class OfferSeeder extends Seeder
             }
 
             // ✨ كومنت مضاف: شروط تحويل وتأكيد الأنواع الجديدة لتطابق المصفوفات
-            if ($vendorType === 'bakeries') { $vendorType = 'bakery'; }
-            if ($vendorType === 'hotels') { $vendorType = 'hotel'; }
+            if ($vendorType === 'bakeries') {
+                $vendorType = 'bakery';
+            }
+            if ($vendorType === 'hotels') {
+                $vendorType = 'hotel';
+            }
 
             if (!array_key_exists($vendorType, $content)) {
                 $vendorType = 'restaurant';
             }
-            
+
             // الكود هينقي بشكل عشوائي من الأصناف بتوع النوع الحالي
             $template = fake()->randomElement($content[$vendorType]);
             $randomImage = fake()->randomElement($images[$vendorType]);
-            
+
             $originalPrice = rand(120, 500);
             $discountPercentage = rand(15, 50) / 100;
             $discountPrice = $originalPrice * (1 - $discountPercentage);
@@ -109,10 +113,10 @@ class OfferSeeder extends Seeder
                 'title' => $template['title'],
                 'description' => $template['description'],
                 'image' => $randomImage,
-                
+
                 // 🔥 تعديل الكمية المتاحة لتكون في الرنج المطلوب (من 1 لـ 10 بس)
                 'quantity_available' => rand(1, 10),
-                
+
                 'original_price' => $originalPrice,
                 'discount_price' => round($discountPrice, 2),
                 'expiration_time' => Carbon::now()->addHours(rand(2, 15)),
