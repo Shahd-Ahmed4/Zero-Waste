@@ -14,10 +14,11 @@ class BranchSeeder extends Seeder
 
         foreach ($vendors as $vendor) {
             // منطق واقعي: عدد الفروع يعتمد على نوع الـ Vendor
-            if ($vendor->vendor_type == 'supermarket') {
+            // ✨ كومنت مضاف: أضفنا الـ hotel مع السوبرماركت والـ bakery مع المطاعم ليعمل بنفس المنطق الأصلي
+            if ($vendor->vendor_type == 'supermarket' || $vendor->vendor_type == 'hotel') {
                 // السوبر ماركت غالباً بيبقى سلسلة (من 3 لـ 5 فروع)
                 $branchCount = rand(3, 5);
-            } elseif ($vendor->vendor_type == 'restaurant') {
+            } elseif ($vendor->vendor_type == 'restaurant' || $vendor->vendor_type == 'bakery') {
                 // المطاعم غالباً فرع رئيسي وممكن فرع كمان (من 1 لـ 2)
                 $branchCount = rand(1, 2);
             } else {

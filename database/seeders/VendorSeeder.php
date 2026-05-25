@@ -13,67 +13,103 @@ class VendorSeeder extends Seeder
     {
         $admins = admin::all();
 
+        // ربط كل اسم محل بالدومين الحقيقي بتاعه عشان جوجل يجيب اللوجو المظبوط
         $restaurants = [
-            'Grill House',
-            'El Sham Restaurant',
-            'BBQ Nation',
-            'Food Corner',
-            'Taste & Go',
-            'Abou Tarek',
-            'El Sultan Food',
-            'Cairo Kitchen',
-            'Daily Meals'
+            ['name' => 'McDonalds', 'domain' => 'mcdonalds.com'],
+            ['name' => 'KFC', 'domain' => 'kfc.com'],
+            ['name' => 'Pizza Hut', 'domain' => 'pizzahut.com'],
+            ['name' => 'Burger King', 'domain' => 'bk.com'],
+            ['name' => 'Subway', 'domain' => 'subway.com'],
+            ['name' => 'Dominos Pizza', 'domain' => 'dominos.com'],
+            ['name' => 'Hardees', 'domain' => 'hardees.com'],
+            ['name' => 'Papa Johns', 'domain' => 'papajohns.com'],
+            ['name' => 'El Malki', 'domain' => 'elmalki-eg.com'] // التعديل هنا فقط بدلاً من كشري أبو طارق
         ];
 
         $cafes = [
-            'Coffee Corner',
-            'Bean House',
-            'Urban Cafe',
-            'Brew Hub',
-            'Daily Coffee',
-            'Latte Spot',
-            'Espresso Time',
-            'Cafe Mocha',
-            'Chill Cup'
+            ['name' => 'Starbucks', 'domain' => 'starbucks.com'],
+            ['name' => 'Costa Coffee', 'domain' => 'costacoffee.com'],
+            ['name' => 'Dunkin Donuts', 'domain' => 'dunkindonuts.com'],
+            ['name' => 'Cinnabon', 'domain' => 'cinnabon.com'],
+            ['name' => 'Caribou Coffee', 'domain' => 'cariboucoffee.com'],
+            ['name' => 'Cafe Supreme', 'domain' => 'cafesupreme.com'],
+            ['name' => 'Cilantro', 'domain' => 'cilantrocafe.com'],
+            ['name' => 'Beano\'s', 'domain' => 'beanoscafe.com'],
+            ['name' => 'TBS (The Bakery Shop)', 'domain' => 'tbs-bakery.com']
         ];
 
         $supermarkets = [
-            'Metro Market',
-            'Carrefour Express',
-            'Fresh Food Market',
-            'Green Basket',
-            'Daily Mart',
-            'Smart Shop',
-            'City Market',
-            'Quick Grocery',
-            'Easy Shop'
+            ['name' => 'Carrefour', 'domain' => 'carrefour.com'],
+            ['name' => 'Metro Market', 'domain' => 'metro-markets.com'],
+            ['name' => 'Spinneys', 'domain' => 'spinneys-egypt.com'],
+            ['name' => 'Kheir Zaman', 'domain' => 'khair-zaman.com'],
+            ['name' => 'Panda', 'domain' => 'panda.com.sa'],
+            ['name' => 'Lulu Hypermarket', 'domain' => 'luluhypermarket.com'],
+            ['name' => 'Gourmet Egypt', 'domain' => 'gourmetegypt.com'],
+            ['name' => 'Seoudi Market', 'domain' => 'seoudimarket.com'],
+            ['name' => 'Alfa Market', 'domain' => 'alfamarket.com.eg']
+        ];
+
+        $bakeries = [
+            ['name' => 'La Poire Bakery', 'domain' => 'lapoire.com'],
+            ['name' => 'Monginis', 'domain' => 'monginis.net'],
+            ['name' => 'El Abd Patisserie', 'domain' => 'elabdfoods.com'],
+            ['name' => 'Tseppas', 'domain' => 'tseppas.com'],
+            ['name' => 'Salé Sucré', 'domain' => 'salesucre.com'],
+            ['name' => 'Nola Cupcakes', 'domain' => 'nolacupcakes.com'],
+            ['name' => 'Coppermelt', 'domain' => 'coppermelt.net'],
+            ['name' => 'Simonds Bakery', 'domain' => 'simonds-bakery.com'],
+            ['name' => 'House of Donuts', 'domain' => 'houseofdonuts.com']
+        ];
+
+        $hotels = [
+            ['name' => 'Hilton Hotels', 'domain' => 'hilton.com'],
+            ['name' => 'Sheraton Hotels', 'domain' => 'marriott.com/sheraton'],
+            ['name' => 'Four Seasons', 'domain' => 'fourseasons.com'],
+            ['name' => 'Fairmont Luxury', 'domain' => 'fairmont.com'],
+            ['name' => 'Ritz Carlton', 'domain' => 'ritzcarlton.com'],
+            ['name' => 'Movenpick', 'domain' => 'movenpick.com'],
+            ['name' => 'Steigenberger', 'domain' => 'steigenberger.com'],
+            ['name' => 'Sofitel Stay', 'domain' => 'sofitel.com'],
+            ['name' => 'Novotel Hotel', 'domain' => 'novotel.com']
         ];
 
         foreach (User::where('role', 'vendor')->get() as $user) {
 
-            $type = fake()->randomElement(['restaurant', 'cafe', 'supermarket']);
+            $type = fake()->randomElement(['restaurant', 'cafe', 'supermarket', 'bakery', 'hotel']);
 
+            // اختيار العنصر العشوائي كـ Array (يحتوي على الاسم والدومين معاً)
             if ($type == 'restaurant') {
-                $name = fake()->randomElement($restaurants);
-                $logoUrl = "https://loremflickr.com/400/400/food,restaurant?lock=" . rand(1, 1000);
+                $selected = fake()->randomElement($restaurants);
             } elseif ($type == 'cafe') {
-                $name = fake()->randomElement($cafes);
-                $logoUrl = "https://loremflickr.com/400/400/food,restaurant?lock=" . rand(1, 1000);
+                $selected = fake()->randomElement($cafes);
+            } elseif ($type == 'bakery') { 
+                $selected = fake()->randomElement($bakeries);
+            } elseif ($type == 'hotel') { 
+                $selected = fake()->randomElement($hotels);
             } else {
-                $name = fake()->randomElement($supermarkets);
-                $logoUrl = "https://loremflickr.com/400/400/grocery,supermarket?lock=" . rand(1, 1000);
+                $selected = fake()->randomElement($supermarkets);
             }
+
+            $name = $selected['name'];
+            // تمرير الدومين المخصص لكل محل لجوجل بشكل ديناميكي ومستحيل يضرب
+            $logoUrl = "https://www.google.com/s2/favicons?domain=" . $selected['domain'] . "&sz=128";
+
+            
+            // التعديل هنا: الإشارة إلى مسار الصور التي وضعتِها في مجلد public
+              $commercialRegisterUrl = 'uploads/commreg.jpeg'; 
+               $taxCardUrl = 'uploads/taxcard.jpeg';  
 
             vendor::create([
                 'user_id' => $user->id,
-                'admin_id' => $admins->random()->id,
+                'admin_id' => $admins->isEmpty() ? null : $admins->random()->id,
                 'business_name' => $name . ' ' . rand(1, 99),
                 'vendor_type' => $type,
                 'logo' => $logoUrl,
 
                 'tax_number' => rand(10000000, 99999999),
-                'commercial_register' => 'https://placehold.co/600x400/png?text=Commercial+Register',
-                'tax_card' => 'https://placehold.co/600x400/png?text=Tax+Card',
+                'commercial_register' => $commercialRegisterUrl,
+                'tax_card' => $taxCardUrl,
             ]);
         }
     }
