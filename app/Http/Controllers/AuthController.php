@@ -98,11 +98,20 @@ class AuthController extends Controller
         if ($user->status === 'blocked') {
             return response(['message' => 'Your account is blocked'], 403);
         }
+        $finalRole = $user->role;
+
+        // لو المستخدم نوعه admin، هندخل جدول الـ admins ونجيب الـ permission_level بتاعه
+        if ($user->role === 'admin') {
+            // بنشيك عبر العلاقة لو السطر موجود بناخد الـ permission_level (super_admin, manager, support)
+            $finalRole = $user->admin ? $user->admin->permission_level : 'support';
+        }
 
         $token = $user->createToken('myapptoken')->plainTextToken;
+        $userData = $user->toArray();
+        $userData['role'] = $finalRole; // 🔥 بنستبدل كلمة admin بـ super_admin أو manager أو support
 
         return response([
-            'user' => $user,
+            'user' => $userData,
             'token' => $token,
             'message' => 'Login successful'
         ], 200);
