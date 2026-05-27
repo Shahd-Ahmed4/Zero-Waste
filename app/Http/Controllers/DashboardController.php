@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\order;
 use App\Models\User;
 use App\Models\offer;
 use App\Models\vendor; // متنسيش تعملي import للـ Vendor
@@ -20,6 +21,8 @@ class DashboardController extends Controller
                     'total_vendors' => User::where('role', 'vendor')->count(),
                     'active_offers' => offer::where('status', 'active')->count(),
                     'expired_offers' => offer::where('status', 'expired')->count(),
+                    'total_orders' => order::count(), // 🔥 السطور الجديدة اللي طلبتها
+                    'total_revenue' => order::sum('total_amount'), // 🔥 حاسب الإيرادات
                 ]
             ]);
         } catch (Exception $e) {
@@ -41,12 +44,7 @@ class DashboardController extends Controller
                     'latest_users' => User::latest()->take(5)->get(['id', 'name', 'email', 'role', 'created_at']),
 
                     // آخر 5 عروض مع اسم المحل - تم تصليح الـ select وتأمين الـ Keys
-                    'latest_offers' => offer::with([
-                        'vendor' => function ($query) {
-                            // 🔥 تكة مهمة: لازم تزودي الـ user_id (أو الفوراين كي اللي عندك في جدول الـ vendors) عشان العلاقة تتربط صح وماتضربش null
-                            $query->select('id', 'user_id', 'business_name', 'logo');
-                        }
-                    ])->latest()->take(5)->get(),
+                    'latest_offers' => offer::latest()->take(5)->get(['id', 'title', 'status', 'created_at']),
                 ]
             ]);
         } catch (Exception $e) {
