@@ -17,11 +17,33 @@ class AdminController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()  //hygbly kol el customers
+    public function index()  // hygbly kol el customers
     {
+        // بنجيب المستخدمين اللي نوعهم كاستمر ومعاهم علاقة الـ customer من الداتابيز
         $customers = User::where('role', 'customer')
             ->with('customer')
-            ->get();
+            ->get()
+            ->map(function ($user) {
+                return [
+                    // 🟢 الـ id بتاع الكاستمر الفعلي من جدول customers
+                    'id' => $user->customer ? $user->customer->id : null,
+
+                    // 🟢 الـ user_id الصريح اللي هما عايزينه
+                    'user_id' => $user->id,
+
+                    'name' => $user->name,
+                    'email' => $user->email,
+
+                    // 🟢 بنقراهم من الـ $user علطول لأنهم عندك في جدول الـ users
+                    'phone' => $user->phone,
+                    'address' => $user->address,
+
+                    'status' => $user->status,
+                    'created_at' => $user->created_at,
+                    'admin_id' => $user->customer ? $user->customer->admin_id : null,
+                ];
+            });
+
         return response()->json([
             'status' => 'success',
             'count' => $customers->count(),
