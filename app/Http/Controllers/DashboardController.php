@@ -24,9 +24,10 @@ class DashboardController extends Controller
                     'total_orders' => order::count(), // 🔥 السطور الجديدة اللي طلبتها
                     'total_revenue' => order::sum('total_amount'), // 🔥 حاسب الإيرادات
                     // 🔥 السطر الجديد السحري اللي هيشغل الـ Chart البياني للأسبوع
-                    'weekly_data' => order::selectRaw('DAYNAME(created_at) as day, COUNT(*) as orders, SUM(total_amount) as revenue')
-                        ->where('created_at', '>=', now()->subDays(7))
-                        ->groupBy('day')
+                    'weekly_data' => Order::selectRaw('DATE(order_date) as date, COUNT(*) as orders, SUM(total_amount) as revenue')
+                        ->where('order_date', '>=', now()->subDays(7))
+                        ->groupBy('date')
+                        ->orderBy('date', 'asc') // عشان الأيام تترتب صح من الأقدم للأحدث في الـ Chart
                         ->get(),
                 ]
             ]);
