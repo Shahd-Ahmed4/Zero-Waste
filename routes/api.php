@@ -31,6 +31,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
     Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
+    Route::get('/offers/smart-recommendations', [OfferController::class, 'getSmartRecommendations']);
 
 
     Route::middleware('vendoractive')->group(function () {
