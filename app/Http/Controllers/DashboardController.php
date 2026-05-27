@@ -23,6 +23,11 @@ class DashboardController extends Controller
                     'expired_offers' => offer::where('status', 'expired')->count(),
                     'total_orders' => order::count(), // 🔥 السطور الجديدة اللي طلبتها
                     'total_revenue' => order::sum('total_amount'), // 🔥 حاسب الإيرادات
+                    // 🔥 السطر الجديد السحري اللي هيشغل الـ Chart البياني للأسبوع
+                    'weekly_data' => order::selectRaw('DAYNAME(created_at) as day, COUNT(*) as orders, SUM(total_amount) as revenue')
+                        ->where('created_at', '>=', now()->subDays(7))
+                        ->groupBy('day')
+                        ->get(),
                 ]
             ]);
         } catch (Exception $e) {
