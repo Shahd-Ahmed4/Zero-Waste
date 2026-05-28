@@ -118,16 +118,24 @@ class AdminController extends Controller
     public function accept($id)
     {
         try {
-            // 1. بنجيب الفيندور أو يرمي 404 لو مش موجود
-            // تأكدي إن اسم الموديل فوق في الـ use مكتوب صح (غالباً Vendor كابيتال)
             $vendor = vendor::findOrFail($id);
 
-            // 2. بنحدث جدول الـ vendors بالحقول اللي موجودة فيه فعلياً بس
+            // 1. بنجيب الـ Admin Profile بتاع المستخدم اللي عامل Login حالياً
+            $adminProfile = auth()->user()->admin; // 👈 بننده على علاقة الـ admin اللي جوة موديل الـ User
+
+            if (!$adminProfile) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'The authenticated user does not have an Admin profile.'
+                ], $id);
+            }
+
+            // 2. بنحدث جدول الـ vendors بالـ ID الصح بتاع جدول الـ admins
             $vendor->update([
-                'admin_id' => auth()->id(),
+                'admin_id' => $adminProfile->id, // 👈 هنا بناخد الـ ID بتاع الأدمن مش بتاع اليوزر
             ]);
 
-            // 3. بنفعل الـ status في مكانها الصح (جدول الـ users)
+            // 3. بنفعل الـ status في جدول الـ users
             if ($vendor->user) {
                 $vendor->user->update([
                     'status' => 'active'
@@ -144,7 +152,7 @@ class AdminController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Something went wrong inside the controller.',
-                'error_details' => $e->getMessage() // هيطبع لك السطر الزعلان بالظبط
+                'error_details' => $e->getMessage()
             ], 500);
         }
     }
