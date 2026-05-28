@@ -93,12 +93,15 @@ class AdminController extends Controller
      */
     public function showPendingDocs($id)
     {
-        // بنجيب التاجر بشرط يكون pending فقط
-        $vendor = vendor::with('user')
-            ->where('status', 'pending')
-            ->where('id', $id)
+        // بنجيب التاجر بشرط يكون الـ user بتاعه حالته pending في جدول الـ users
+        $vendor = vendor::whereHas('user', function ($query) {
+            $query->where('status', 'pending');
+        })
+            ->with('user')
+            ->where('id', $id) // بنجيب الفيندور بالـ ID بتاعه
             ->first();
 
+        // لو الفيندور مش موجود أو حالته مش pending هيرجع 404 نضيفة
         if (!$vendor) {
             return response()->json([
                 'status' => 'error',
@@ -106,9 +109,10 @@ class AdminController extends Controller
             ], 404);
         }
 
+        // يرجع الداتا والأوراق القانونية زي السجل والبطاقة واللوجو
         return response()->json([
             'status' => 'success',
-            'data' => $vendor // هنا هيشوف السجل والبطاقة وكل حاجة
+            'data' => $vendor
         ]);
     }
     public function accept($id)
