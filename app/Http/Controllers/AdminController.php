@@ -160,29 +160,46 @@ class AdminController extends Controller
     /**
      * رفض التاجر مع ذكر السبب
      */
-    public function reject(Request $request, $id)
+    public function reject($id)
     {
-        // بنعمل Validation لسبب الرفض عشان ميكونش فاضي
-        $request->validate([
-            'reason' => 'required|string|max:500'
-        ]);
+        try {
+            $vendor = vendor::findOrFail($id);
 
-        $vendor = vendor::findOrFail($id);
+            // 1. بنجيب الـ Admin Profile بتاع المستخدم اللي عامل Login حالياً
+            $adminProfile = auth()->user()->admin;
 
-        $vendor->user->update([
-            'status' => 'rejected',
-        ]);
-        // لو ضفتي حقل rejection_reason في الميجريشن زي ما اتفقنا
-        $vendor->update([
-            'rejection_reason' => $request->reason,
-            'admin_id' => auth()->id(),
-        ]);
+            if (!$adminProfile) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'The authenticated user does not have an Admin profile.'
+                ], 403);
+            }
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Vendor request rejected. The reason has been recorded.',
-            'data' => $vendor->load('user')
-        ], 200);
+            // 2. بنحدث جدول الـ vendors بالـ ID الصح بتاع الأدمن
+            $vendor->update([
+                'admin_id' => $adminProfile->id,
+            ]);
+
+            // 3. بنغير الـ status في جدول الـ users لـ rejected عشان السيستم يرفضه
+            if ($vendor->user) {
+                $vendor->user->update([
+                    'status' => 'rejected'
+                ]);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Vendor has been rejected successfully.',
+                'data' => $vendor->load('user') // عشان تشوفي الحالة الجديدة 'rejected' في الـ Postman
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Something went wrong inside the controller.',
+                'error_details' => $e->getMessage()
+            ], 500);
+        }
     }
     public function blockUser($id)
     {
