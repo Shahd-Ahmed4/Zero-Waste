@@ -117,25 +117,36 @@ class AdminController extends Controller
     }
     public function accept($id)
     {
-        // 1. بنجيب الفيندور أو يرمي 404 لو مش موجود
-        $vendor = vendor::findOrFail($id);
+        try {
+            // 1. بنجيب الفيندور أو يرمي 404 لو مش موجود
+            // تأكدي إن اسم الموديل فوق في الـ use مكتوب صح (غالباً Vendor كابيتال)
+            $vendor = vendor::findOrFail($id);
 
-        // 2. بنحدث جدول الـ vendors بالحقول اللي موجودة فيه فعلياً بس
-        $vendor->update([
-            'admin_id' => auth()->id(), // بنسجل مين الأدمن اللي وافق عليه
-        ]);
+            // 2. بنحدث جدول الـ vendors بالحقول اللي موجودة فيه فعلياً بس
+            $vendor->update([
+                'admin_id' => auth()->id(),
+            ]);
 
-        // 3. بنفعل الـ status في مكانها الصح (جدول الـ users) عشان يعرف يعمل Login
-        $vendor->user->update([
-            'status' => 'active'
-        ]);
+            // 3. بنفعل الـ status في مكانها الصح (جدول الـ users)
+            if ($vendor->user) {
+                $vendor->user->update([
+                    'status' => 'active'
+                ]);
+            }
 
-        // 4. نرجع الـ Response النضيف
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Vendor approved successfully. They are now active.',
-            'data' => $vendor->load('user') // بنحمل بيانات اليوزر معاها عشان الفرونت إند يشوف الحالة الجديدة
-        ], 200);
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Vendor approved successfully. They are now active.',
+                'data' => $vendor->load('user')
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Something went wrong inside the controller.',
+                'error_details' => $e->getMessage() // هيطبع لك السطر الزعلان بالظبط
+            ], 500);
+        }
     }
 
     /**
