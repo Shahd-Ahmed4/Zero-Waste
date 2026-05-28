@@ -401,20 +401,22 @@ class AdminController extends Controller
     }
     public function toggleVisibility($id)
     {
-        if (auth()->user()->role !== 'admin') {
-            return response()->json(['message' => 'Access Denied. Admins only.'], 403);
+        // 🟢 التعديل الصح والمكشوف للفرونت إند: السماح بالصلاحيات للـ Roles التلاتة
+        if (!in_array(auth()->user()->role, ['support', 'super_admin', 'manager'])) {
+            return response()->json(['message' => 'Access Denied. Authorized staff only.'], 403);
         }
+
         $review = review::findOrFail($id);
 
-        // بيعكس الحالة (لو true يخليها false والعكس)
-        $review->update([
-            'is_visible' => !$review->is_visible
-        ]);
+        // بيعكس الحالة وبيحفظ
+        $review->is_visible = !$review->is_visible;
+        $review->save();
 
         return response()->json([
-            'message' => 'Review visibility updated!',
+            'status' => 'success',
+            'message' => 'Review visibility updated successfully!',
             'is_visible' => $review->is_visible
-        ]);
+        ], 200);
     }
 }
 
