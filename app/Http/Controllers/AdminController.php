@@ -206,10 +206,8 @@ class AdminController extends Controller
         // بنجيب اليوزر بالـ id
         $user = User::findOrFail($id);
 
-        // تحديث الحالة لـ blocked
-        $user->update([
-            'status' => 'blocked'
-        ]);
+        $user->status = 'blocked';
+        $user->save();
 
         return response()->json([
             'status' => 'success',
