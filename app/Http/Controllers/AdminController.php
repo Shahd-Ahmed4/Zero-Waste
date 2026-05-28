@@ -56,20 +56,21 @@ class AdminController extends Controller
      */
     public function pendingVendors()
     {
-        // 1. هنجيب المحلات اللي حالتها pending بس
+        // 1. هنجيب المحلات اللي حالتها pending بس مع بيانات اليوزر
         $pendingVendors = vendor::with([
             'user' => function ($query) {
-                // بنختار بس الاسم والإيميل من جدول اليوزر عشان لو الأدمن عايز يلمحهم بره
-                $query->select('id', 'name', 'email', 'phone');
+                // 🟢 سيبنا اليوزر يجيب حقوله كاملة عشان نضمن إن الـ Foreign Key يربط صح وميجيبش 500
+                $query->select('*');
             }
         ])
-            // 2. بنختار الحقول الأساسية من جدول الـ Vendor
+            // 2. الحقول اللي إنتي عايزاها بالظبط من جدول الـ Vendor
+            // 🔥 لو ضربت 500، جربي تشوفي هل في المايجريشن مكتوبة business_name ولا name بس؟ أو vendor_type كابيتال؟
             ->select('id', 'user_id', 'business_name', 'logo', 'vendor_type', 'created_at')
             ->where('status', 'pending')
-            ->latest() // عشان الجديد يظهر فوق
+            ->latest()
             ->get();
 
-        // 3. نبعت الـ Response
+        // 3. نبعت الـ Response النضيف بتاعك
         if ($pendingVendors->isEmpty()) {
             return response()->json([
                 'status' => 'success',
