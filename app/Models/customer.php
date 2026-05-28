@@ -7,6 +7,8 @@ use App\Models\User;
 use App\Models\admin;
 use App\Models\review;
 use App\Models\order;
+use App\Models\vendor;
+
 
 class customer extends Model
 {
@@ -26,5 +28,9 @@ class customer extends Model
     public function reviews()
     {
         return $this->hasMany(review::class);
+    }
+    public function favoriteVendors()
+    {
+        return $this->belongsToMany(vendor::class, 'favorites', 'customer_id', 'vendor_id')->withTimestamps();
     }
 }

@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OfferController;
 use App\Http\Controllers\OrderController;
@@ -119,6 +120,8 @@ Route::middleware(['auth:sanctum', 'checkcustomer'])->group(function () {
     Route::post('/reviews', [ReviewController::class, 'store']);
     Route::get('/my-reviews', [ReviewController::class, 'myReviews']); // تقييماتي أنا ككاستمر
     Route::delete('/reviews/{id}', [ReviewController::class, 'destroy']);
+    Route::post('/favorites/toggle', [FavoriteController::class, 'toggleFavorite']);
+    Route::get('/favorites', [FavoriteController::class, 'getFavorites']);
 });
 
 

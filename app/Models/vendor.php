@@ -8,6 +8,8 @@ use App\Models\User;
 use App\Models\admin;
 use App\Models\branch;
 use App\Models\offer;
+use App\Models\customer;
+
 
 class vendor extends Model
 {
@@ -24,11 +26,11 @@ class vendor extends Model
     ];
     protected $hidden = ['created_at', 'updated_at'];
     protected function logo(): Attribute
-{
-    return Attribute::make(
-        get: fn ($value) => str_starts_with($value, 'http') ? $value : asset('storage/' . $value),
-    );
-}
+    {
+        return Attribute::make(
+            get: fn($value) => str_starts_with($value, 'http') ? $value : asset('storage/' . $value),
+        );
+    }
     public function user()
     {
         return $this->belongsTo(User::class);
@@ -49,5 +51,10 @@ class vendor extends Model
     public function orders()
     {
         return $this->hasMany(order::class);
+    }
+    public function favoritedByCustomers()
+    {
+        // الفيندور ممكن يكون موجود في مفضلة كذا زبون
+        return $this->belongsToMany(customer::class, 'favorites', 'vendor_id', 'customer_id')->withTimestamps();
     }
 }

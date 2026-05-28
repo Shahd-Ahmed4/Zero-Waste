@@ -70,6 +70,7 @@ class OfferSeeder extends Seeder
             'bakery' => ['uploads/images_GradProj/cafe1.jpg', 'uploads/images_GradProj/cafe2.jpg', 'uploads/images_GradProj/cafe3.jpg', 'uploads/images_GradProj/cafe4.jpg', 'uploads/images_GradProj/cafe5.jpg'],
             'hotel' => ['uploads/images_GradProj/restaurant1.jpg', 'uploads/images_GradProj/restaurant2.jpg', 'uploads/images_GradProj/restaurant3.jpg', 'uploads/images_GradProj/restaurant4.jpg'],
         ];
+        $statuses = ['active', 'expired', 'disabled'];
 
         // ✨ كومنت مضاف: هنا عدلنا اللوب لتلف 25 لفة بالظبط عشان ننتج 25 عرض فقط في قاعدة البيانات
         for ($i = 0; $i < 25; $i++) {
@@ -107,6 +108,8 @@ class OfferSeeder extends Seeder
             $originalPrice = rand(120, 500);
             $discountPercentage = rand(15, 50) / 100;
             $discountPrice = $originalPrice * (1 - $discountPercentage);
+            $randomStatus = fake()->randomElement($statuses);
+            $targetDate = Carbon::create(2026, 6, rand(6, 8), rand(10, 23), rand(0, 59));
 
             offer::create([
                 'branch_id' => $branch->id,
@@ -119,8 +122,8 @@ class OfferSeeder extends Seeder
 
                 'original_price' => $originalPrice,
                 'discount_price' => round($discountPrice, 2),
-                'expiration_time' => Carbon::now()->addHours(rand(2, 15)),
-                'status' => 'active',
+                'expiration_time' => $targetDate,
+                'status' => $randomStatus,
             ]);
         }
     }
