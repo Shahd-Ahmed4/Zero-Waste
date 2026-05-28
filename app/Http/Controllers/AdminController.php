@@ -113,18 +113,24 @@ class AdminController extends Controller
     }
     public function accept($id)
     {
+        // 1. بنجيب الفيندور أو يرمي 404 لو مش موجود
         $vendor = vendor::findOrFail($id);
 
+        // 2. بنحدث جدول الـ vendors بالحقول اللي موجودة فيه فعلياً بس
         $vendor->update([
-            'status' => 'active',
             'admin_id' => auth()->id(), // بنسجل مين الأدمن اللي وافق عليه
         ]);
-        $vendor->user->update(['status' => 'active']); // لازم اليوزر نفسه يتفعل عشان يعرف يعمل Login
 
+        // 3. بنفعل الـ status في مكانها الصح (جدول الـ users) عشان يعرف يعمل Login
+        $vendor->user->update([
+            'status' => 'active'
+        ]);
+
+        // 4. نرجع الـ Response النضيف
         return response()->json([
             'status' => 'success',
             'message' => 'Vendor approved successfully. They are now active.',
-            'data' => $vendor
+            'data' => $vendor->load('user') // بنحمل بيانات اليوزر معاها عشان الفرونت إند يشوف الحالة الجديدة
         ], 200);
     }
 
