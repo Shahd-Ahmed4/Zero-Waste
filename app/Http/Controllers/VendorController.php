@@ -19,6 +19,7 @@ class VendorController extends Controller
     public function index(Request $request)
     {
         $user = auth('sanctum')->user();
+
         if (!$user || $user->role !== 'admin') {
             $query = vendor::whereHas('user', function ($q) {
                 $q->where('status', 'active');
@@ -28,23 +29,48 @@ class VendorController extends Controller
                         'logo',
                         'vendor_type'
                     ]);
+
+            // الفلاتر العادية للزوار والمستخدمين
+            if ($request->has('search')) {
+                $query->where('business_name', 'LIKE', '%' . $request->search . '%');
+            }
+            if ($request->has('type')) {
+                $query->where('vendor_type', $request->type);
+            }
+
+            $vendors = $query->paginate(10);
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $vendors
+            ], 200);
         }
-        // 2. لو هو Admin ياشا.. يفتح له كل حاجة
+        // 🟢 لو هو Admin ياشا.. بننفذ اقتراح الفرونت إند هنا علطول ونقفل الـ Response
         else {
-            // بنجيب كل الفيندوز (بما فيهم الـ pending و الـ rejected) وبكل الحقول
+            // بنجيب كل الفيندوز بالـ الكولومز كاملة مع اليوزر
             $query = vendor::with('user');
+
+            // لو الأدمن باعت سيرش أو فلتر برضه يشتغل معاه ميبقاش واقف
+            if ($request->has('search')) {
+                $query->where('business_name', 'LIKE', '%' . $request->search . '%');
+            }
+            if ($request->has('type')) {
+                $query->where('vendor_type', $request->type);
+            }
+
+            $vendors = $query->paginate(10);
+
+            // رفع الـ status بره عشان خاطر الفرونت إند
+            $vendors->getCollection()->transform(function ($vendor) {
+                $vendor->status = $vendor->user->status ?? 'pending';
+                return $vendor;
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $vendors
+            ], 200);
         }
-        if ($request->has('search')) {
-            $query->where('business_name', 'LIKE', '%' . $request->search . '%');
-        }
-        if ($request->has('type')) {
-            $query->where('vendor_type', $request->type);
-        }
-        $vendors = $query->paginate(10);
-        return response()->json([
-            'status' => 'success',
-            'data' => $vendors
-        ], 200);
     }
 
     public function completesetup(Request $request)
