@@ -56,21 +56,22 @@ class AdminController extends Controller
      */
     public function pendingVendors()
     {
-        // 1. هنجيب المحلات اللي حالتها pending بس مع بيانات اليوزر
-        $pendingVendors = vendor::with([
-            'user' => function ($query) {
-                // 🟢 سيبنا اليوزر يجيب حقوله كاملة عشان نضمن إن الـ Foreign Key يربط صح وميجيبش 500
-                $query->select('*');
-            }
-        ])
-            // 2. الحقول اللي إنتي عايزاها بالظبط من جدول الـ Vendor
-            // 🔥 لو ضربت 500، جربي تشوفي هل في المايجريشن مكتوبة business_name ولا name بس؟ أو vendor_type كابيتال؟
+        // 1. بنجيب الـ vendors اللي الـ user بتاعهم حالته pending في جدول الـ users
+        $pendingVendors = vendor::whereHas('user', function ($query) {
+            $query->where('status', 'pending');
+        })
+            ->with([
+                'user' => function ($query) {
+                    // بنجيب البيانات الأساسية لليوزر عشان تظهر للأدمن
+                    $query->select('id', 'name', 'email', 'phone');
+                }
+            ])
+            // 2. الحقول اللي إنتي عايزاها بالظبط من جدول الـ Vendor (متطابقة 100% مع المايجريشن)
             ->select('id', 'user_id', 'business_name', 'logo', 'vendor_type', 'created_at')
-            ->where('status', 'pending')
             ->latest()
             ->get();
 
-        // 3. نبعت الـ Response النضيف بتاعك
+        // 3. لو مفيش أي فيندور معلق، بنرجع ريسبونس فاضي نضيف
         if ($pendingVendors->isEmpty()) {
             return response()->json([
                 'status' => 'success',
@@ -79,6 +80,7 @@ class AdminController extends Controller
             ]);
         }
 
+        // 4. نبعت الداتا المتفلترة صح
         return response()->json([
             'status' => 'success',
             'count' => $pendingVendors->count(),
