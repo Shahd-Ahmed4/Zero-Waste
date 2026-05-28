@@ -36,44 +36,55 @@ class FavoriteController extends Controller
     // 2. دالة جلب المفضلة بالترتيب الذكي (حسب الموقع وصلاحية العروض)
     public function getFavorites(Request $request)
     {
-        // الفرونت إند بيبعت لوكيشن الزبون الحالي عشان نحسب المسافة
-        $request->validate([
-            'customer_lat' => 'required|numeric',
-            'customer_long' => 'required|numeric',
-        ]);
+        try {
+            // الفرونت إند بيبعت لوكيشن الزبون الحالي عشان نحسب المسافة
+            $request->validate([
+                'customer_lat' => 'required|numeric',
+                'customer_long' => 'required|numeric',
+            ]);
 
-        $customer = customer::where('user_id', auth()->id())->first();
+            $customer = customer::where('user_id', auth()->id())->first();
 
-        if (!$customer) {
-            return response()->json(['message' => 'Customer account not found.'], 404);
+            if (!$customer) {
+                return response()->json(['message' => 'Customer account not found.'], 404);
+            }
+
+            $lat = $request->customer_lat;
+            $lng = $request->customer_long;
+
+            $favorites = $customer->favoriteVendors()
+                ->with([
+                    'branches' => function ($query) use ($lat, $lng) {
+                        $query->select('*')
+                            ->selectRaw(
+                                "( 6371 * acos( cos( radians(?) ) * cos( radians(lat) ) * cos( radians(long) - radians(?) ) + sin( radians(?) ) * sin( radians(lat) ) ) ) AS distance",
+                                [$lat, $lng, $lat]
+                            )
+                            ->orderBy('distance', 'asc')
+                            ->with([
+                                'offers' => function ($offerQuery) {
+                                    $offerQuery->where('quantity_available', '>', 0)
+                                        ->where('expiration_time', '>', now())
+                                        ->orderBy('expiration_time', 'asc');
+                                }
+                            ]);
+                    }
+                ])
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $favorites
+            ], 200);
+
+        } catch (\Exception $e) {
+            // 🟢 هنا اللعبة! السيرفر هيرجعلك اسم الغلط والسطر كاملاً في الـ Response بدل كلمة Server Error المبهمة
+            return response()->json([
+                'message' => 'Server Error Caught!',
+                'error_message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ], 500);
         }
-
-        $lat = $request->customer_lat;
-        $lng = $request->customer_long;
-
-        // بنجيب الفيندوز اللي في المفضلة، وجواها بنجيب الفروع ونرتبها بالمسافة وعروضها بالوقت
-        $favorites = $customer->favoriteVendors()
-            ->with(['branches' => function ($query) use ($lat, $lng) {
-                $query->select('*')
-                    // معادلة Haversine لحساب المسافة بين موقع الزبون وموقع الفرع في الداتابيز
-                    ->selectRaw(
-                        "( 6371 * acos( cos( radians(?) ) * cos( radians( lat ) ) * cos( radians( long ) - radians(?) ) + sin( radians(?) ) * sin( radians( lat ) ) ) ) AS distance", 
-                        [$lat, $lng, $lat]
-                    )
-                    // الفروع الأقرب للمستخدم تظهر الأول
-                    ->orderBy('distance', 'asc')
-                    // نجيب العروض المتاحة جوة كل فرع، ونرتبها بالأقرب لانتهاء الصلاحية
-                    ->with(['offers' => function ($offerQuery) {
-                        $offerQuery->where('quantity_available', '>', 0)
-                                   ->where('expiration_time', '>', now())
-                                   ->orderBy('expiration_time', 'asc'); // الأقرب للبوظان يظهر الأول
-                    }]);
-            }])
-            ->get();
-
-        return response()->json([
-            'success' => true,
-            'data' => $favorites
-        ], 200);
     }
 }
