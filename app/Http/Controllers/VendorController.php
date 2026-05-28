@@ -23,6 +23,7 @@ class VendorController extends Controller
             $query = vendor::whereHas('user', function ($q) {
                 $q->where('status', 'active');
             })->select([
+                        'id',
                         'business_name',
                         'logo',
                         'vendor_type'
@@ -31,7 +32,7 @@ class VendorController extends Controller
         // 2. لو هو Admin ياشا.. يفتح له كل حاجة
         else {
             // بنجيب كل الفيندوز (بما فيهم الـ pending و الـ rejected) وبكل الحقول
-            $query = vendor::query();
+            $query = vendor::with('user');
         }
         if ($request->has('search')) {
             $query->where('business_name', 'LIKE', '%' . $request->search . '%');
