@@ -53,10 +53,11 @@ class OrderItemController extends Controller
      * 3. تقرير الأرباح (الماليات)
      * بيحسب فقط الأوردرات الـ Completed
      */
+
     public function salesReport()
     {
         try {
-            // 1. بنجيب الفيندور بروفايل المربوط باليوزر اللي عامل login حالياً
+            // 1. بنجيب الـ Vendor Profile بتاع اليوزر الحالي
             $vendorProfile = auth()->user()->vendor;
 
             if (!$vendorProfile) {
@@ -66,14 +67,14 @@ class OrderItemController extends Controller
                 ], 403);
             }
 
-            $vendorId = $vendorProfile->id; // 🟢 هنا معانا الـ ID الصح بتاع جدول الـ vendors
+            $vendorId = $vendorProfile->id; // الـ ID الصح من جدول الـ vendors
 
-            // 2. بنحسب التقرير بناءً على الـ vendor_id المظبوط
-            $report = order_item::whereHas('offer', function ($query) use ($vendorId) {
+            // 2. اللفة المظبوطة: بنفلتر الـ Items بناءً على الـ Offer المربوط بالـ Branch التابع للفيندور ده
+            $report = order_item::whereHas('offer.branch', function ($query) use ($vendorId) {
+                // 💡 ملحوظة: لو جدول الـ branches عندك مربوط بـ user_id مش vendor_id، غيري الكلمة اللي تحت لـ 'user_id' ومرري auth()->id()
                 $query->where('vendor_id', $vendorId);
             })
                 ->whereHas('order', function ($query) {
-                    // اتأكدي إن اسم الكولوم جوة جدول الـ orders هو order_status فعلاً
                     $query->where('order_status', 'completed');
                 })
                 ->select(
@@ -97,7 +98,7 @@ class OrderItemController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Something went wrong inside sales report controller.',
-                'error_details' => $e->getMessage() // هيطبع لك السطر الزعلان لو لسه فيه حاجة ناقصة
+                'error_details' => $e->getMessage()
             ], 500);
         }
     }
