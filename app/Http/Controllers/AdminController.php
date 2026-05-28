@@ -401,14 +401,11 @@ class AdminController extends Controller
     }
     public function toggleVisibility($id)
     {
-        // 🟢 التعديل الصح والمكشوف للفرونت إند: السماح بالصلاحيات للـ Roles التلاتة
-        if (!in_array(auth()->user()->role, ['support', 'super_admin', 'manager'])) {
-            return response()->json(['message' => 'Access Denied. Authorized staff only.'], 403);
-        }
+        // 🟢 مش محتاجين أي تشيك صلاحيات هنا لأن الـ Middleware (checkadmin:super_admin,manager) قايم بالواجب بره!
 
         $review = review::findOrFail($id);
 
-        // بيعكس الحالة وبيحفظ
+        // بيعكس الحالة وبيحفظ فوراً في الـ DB
         $review->is_visible = !$review->is_visible;
         $review->save();
 
