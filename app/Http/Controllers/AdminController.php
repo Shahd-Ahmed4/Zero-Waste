@@ -161,46 +161,45 @@ class AdminController extends Controller
      * رفض التاجر مع ذكر السبب
      */
     public function reject($id)
-    {
-        try {
-            $vendor = vendor::findOrFail($id);
+{
+    try {
+        $vendor = vendor::findOrFail($id); 
 
-            // 1. بنجيب الـ Admin Profile بتاع المستخدم اللي عامل Login حالياً
-            $adminProfile = auth()->user()->admin;
-
-            if (!$adminProfile) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'The authenticated user does not have an Admin profile.'
-                ], 403);
-            }
-
-            // 2. بنحدث جدول الـ vendors بالـ ID الصح بتاع الأدمن
-            $vendor->update([
-                'admin_id' => $adminProfile->id,
-            ]);
-
-            // 3. بنغير الـ status في جدول الـ users لـ rejected عشان السيستم يرفضه
-            if ($vendor->user) {
-                $vendor->user->update([
-                    'status' => 'rejected'
-                ]);
-            }
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Vendor has been rejected successfully.',
-                'data' => $vendor->load('user') // عشان تشوفي الحالة الجديدة 'rejected' في الـ Postman
-            ], 200);
-
-        } catch (\Exception $e) {
+        $adminProfile = auth()->user()->admin; 
+        if (!$adminProfile) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Something went wrong inside the controller.',
-                'error_details' => $e->getMessage()
-            ], 500);
+                'message' => 'The authenticated user does not have an Admin profile.'
+            ], 403);
         }
+
+        // تحديث الفيندور
+        $vendor->update([
+            'admin_id' => $adminProfile->id, 
+        ]);
+
+        // تحديث اليوزر بالأقواس عشان يسمع في الداتابيز فوراً 🟢
+        $vendor->user()->update([
+            'status' => 'rejected'
+        ]);
+
+        // بنقول للارافيل روح هات الداتا الفرش اللي لسه مكتوبة حالا في الداتابيز
+        $vendor->refresh(); 
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Vendor has been rejected successfully.',
+            'data' => $vendor->load('user') 
+        ], 200);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Something went wrong inside the controller.',
+            'error_details' => $e->getMessage()
+        ], 500);
     }
+}
     public function blockUser($id)
     {
         // بنجيب اليوزر بالـ id
