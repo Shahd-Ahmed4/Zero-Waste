@@ -57,16 +57,16 @@ class FavoriteController extends Controller
                 $query->select('*')
                     // معادلة Haversine لحساب المسافة بين موقع الزبون وموقع الفرع في الداتابيز
                     ->selectRaw(
-                        "( 6371 * acos( cos( radians(?) ) * cos( radians( Lat ) ) * cos( radians( Lng ) - radians(?) ) + sin( radians(?) ) * sin( radians( Lat ) ) ) ) AS distance", 
+                        "( 6371 * acos( cos( radians(?) ) * cos( radians( lat ) ) * cos( radians( long ) - radians(?) ) + sin( radians(?) ) * sin( radians( lat ) ) ) ) AS distance", 
                         [$lat, $lng, $lat]
                     )
                     // الفروع الأقرب للمستخدم تظهر الأول
                     ->orderBy('distance', 'asc')
                     // نجيب العروض المتاحة جوة كل فرع، ونرتبها بالأقرب لانتهاء الصلاحية
                     ->with(['offers' => function ($offerQuery) {
-                        $offerQuery->where('Quantity_Available', '>', 0)
-                                   ->where('Expiration_Time', '>', now())
-                                   ->orderBy('Expiration_Time', 'asc'); // الأقرب للبوظان يظهر الأول
+                        $offerQuery->where('quantity_available', '>', 0)
+                                   ->where('expiration_time', '>', now())
+                                   ->orderBy('expiration_time', 'asc'); // الأقرب للبوظان يظهر الأول
                     }]);
             }])
             ->get();
