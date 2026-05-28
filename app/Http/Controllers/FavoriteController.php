@@ -57,7 +57,7 @@ class FavoriteController extends Controller
                     'branches' => function ($query) use ($lat, $lng) {
                         $query->select('*')
                             ->selectRaw(
-                                "( 6371 * acos( cos( radians(?) ) * cos( radians(lat) ) * cos( radians(long) - radians(?) ) + sin( radians(?) ) * sin( radians(lat) ) ) ) AS distance",
+                                "( 6371 * acos( cos( radians(?) ) * cos( radians(`lat`) ) * cos( radians(`long`) - radians(?) ) + sin( radians(?) ) * sin( radians(`lat`) ) ) ) AS distance",
                                 [$lat, $lng, $lat]
                             )
                             ->orderBy('distance', 'asc')
