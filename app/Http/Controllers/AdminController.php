@@ -218,13 +218,17 @@ class AdminController extends Controller
 
     public function unblockUser($id)
     {
+        // بنجيب اليوزر بالـ id
         $user = User::findOrFail($id);
 
-        // بنرجعه active (أو pending حسب نظامك)
-        $user->update(['status' => 'active']);
+        // 🟢 بنعدل الحالة لـ active مباشرة وبنحفظ بـ save عشان نضمن التسميع في الـ DB
+        $user->status = 'active';
+        $user->save();
 
         return response()->json([
-            'message' => 'User unblocked successfully.'
+            'status' => 'success',
+            'message' => 'User unblocked successfully.',
+            'data' => $user // رجعي الـ data كمان عشان الفرونت إند يشوف الحالة الجديدة لايف
         ], 200);
     }
     public function destroyVendor($id)
