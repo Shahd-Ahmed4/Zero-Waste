@@ -112,21 +112,27 @@ class VendorController extends Controller
 
         // 2. رفع اللوجو (لو موجود)
         if ($request->hasFile('logo')) {
-            $logoPath = $request->file('logo')->store('vendors/logos', 'public');
-            $vendor->logo = $logoPath;
+            $logoFile = $request->file('logo');
+            $logoName = time() . '_logo_' . $logoFile->getClientOriginalName();
+            $logoFile->move(public_path('uploads/vendors/logos'), $logoName);
+            $vendor->logo = 'uploads/vendors/logos/' . $logoName;
         }
 
         // 3. رفع السجل التجاري
         if ($request->hasFile('commercial_register')) {
-            $crPath = $request->file('commercial_register')->store('vendors/docs', 'public');
-            $vendor->commercial_register = $crPath;
-        }
+        $crFile = $request->file('commercial_register');
+        $crName = time() . '_cr_' . $crFile->getClientOriginalName();
+        $crFile->move(public_path('uploads/vendors/docs'), $crName);
+        $vendor->commercial_register = 'uploads/vendors/docs/' . $crName;
+    }
 
         // 4. رفع البطاقة الضريبية
         if ($request->hasFile('tax_card')) {
-            $tcPath = $request->file('tax_card')->store('vendors/docs', 'public');
-            $vendor->tax_card = $tcPath;
-        }
+        $tcFile = $request->file('tax_card');
+        $tcName = time() . '_tc_' . $tcFile->getClientOriginalName();
+        $tcFile->move(public_path('uploads/vendors/docs'), $tcName);
+        $vendor->tax_card = 'uploads/vendors/docs/' . $tcName;
+    }
 
         // 5. حفظ باقي البيانات النصية
         $vendor->update([
