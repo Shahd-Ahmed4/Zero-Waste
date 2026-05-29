@@ -112,99 +112,99 @@ class OfferController extends Controller
     }
 
     public function getSmartRecommendations(Request $request)
-{
-    $user = auth('sanctum')->user();
+    {
+        $user = auth('sanctum')->user();
 
-    // 1️⃣ لو المستخدم مش عامل Login (ضيف مثلاً)، هنرجعله العروض العادية حسب الوقت لعدم وجود تاريخ شرائي
-    if (!$user) {
-        $fallbackOffers = offer::where('status', 'active')
-            ->where('expiration_time', '>', now())
-            ->orderBy('expiration_time', 'asc')
-            ->take(10)
-            ->get();
-            
-        return response()->json([
-            'status' => 'success',
-            'data' => $fallbackOffers
-        ]);
-    }
+        // 1️⃣ لو المستخدم مش عامل Login (ضيف مثلاً)، هنرجعله العروض العادية حسب الوقت لعدم وجود تاريخ شرائي
+        if (!$user) {
+            $fallbackOffers = offer::where('status', 'active')
+                ->where('expiration_time', '>', now())
+                ->orderBy('expiration_time', 'asc')
+                ->take(10)
+                ->get();
 
-    try {
-        // 2️⃣ السحر الأول: نكتشف "ذوق مصلحة الزبون" بناءً على تاريخ أوردراته السابقة
-        // بنعمل Join بين الأوردرات، العروض، الفروع، وجدول الفيندورز عشان نعرف الـ vendor_type المفضل
-        $userPreference = order::where('orders.user_id', $user->id)
-            ->join('offers', 'orders.offer_id', '=', 'offers.id')
-            ->join('branches', 'offers.branch_id', '=', 'branches.id')
-            ->join('vendors', 'branches.vendor_id', '=', 'vendors.id')
-            ->select('vendors.vendor_type', \DB::raw('COUNT(*) as order_count'))
-            ->groupBy('vendors.vendor_type')
-            ->orderBy('order_count', 'desc') // الأعلى شراءً في الصدارة
-            ->first(); // بناخد التايب رقم 1 المفضل عنده
-
-        $favoriteType = $userPreference ? $userPreference->vendor_type : null;
-
-        // 3️⃣ بناء الاستعلام الأساسي لعروض الأبلكيشن النشطة حالياً
-        $query = offer::query()->select('offers.id', 'offers.title', 'offers.description', 'offers.image', 'offers.original_price', 'offers.discount_price', 'offers.expiration_time', 'offers.status', 'offers.branch_id', 'offers.created_at')
-            ->with([
-                'branch:id,branch_name,store_address,lat,long,vendor_id',
-                'branch.vendor:id,business_name,logo,vendor_type'
-            ])
-            ->where('offers.status', 'active')
-            ->where('expiration_time', '>', now());
-
-        // 4️⃣ السحر الثاني: دمج "الموقع" مع "ذوق الزبون الشرائي" في الترتيب (Scoring)
-        if ($request->filled('lat') && $request->filled('long')) {
-            $lat = $request->lat;
-            $lon = $request->long;
-
-            // بنربط الجداول عشان نحسب المسافة ونعرف نوع المحل لكل عرض
-            $query->join('branches', 'offers.branch_id', '=', 'branches.id')
-                  ->join('vendors', 'branches.vendor_id', '=', 'vendors.id');
-
-            // حساب المسافة الجغرافية بالكيلومتر (Haversine Formula)
-            $distanceSql = "(6371 * acos(cos(radians($lat)) * cos(radians(branches.lat)) * cos(radians(branches.long) - radians($lon)) + sin(radians($lat)) * sin(radians(branches.lat))))";
-            $query->addSelect(\DB::raw("$distanceSql AS distance"));
-
-            // حساب الـ Score الذكي:
-            // لو نوع الفيندور بتاع العرض هو نفس الـ favoriteType اللي الزبون بيحبه دايماً، العرض ياخد +15 نقطة فوراً!
-            // ونطرح منه المسافة عشان العروض الأقرب تاخد نقاط أعلى برضه
-            $favoriteTypeCondition = $favoriteType ? "'$favoriteType'" : "'none'";
-            $scoreSql = "CASE WHEN vendors.vendor_type = $favoriteTypeCondition THEN 15 ELSE 0 END - ($distanceSql * 1.5)";
-            
-            $query->addSelect(\DB::raw("($scoreSql) AS recommendation_score"))
-                  ->orderBy('recommendation_score', 'desc'); // الترتيب من الأعلى سكور للأقل
-
-        } else {
-            // 5️⃣ لو قافل الـ GPS أو قاعدين في مكان مجهول، هنرتب بناءً على ذوقه الشرائي دايماً ثم قرب انتهاء الوقت
-            if ($favoriteType) {
-                $query->join('branches', 'offers.branch_id', '=', 'branches.id')
-                      ->join('vendors', 'branches.vendor_id', '=', 'vendors.id')
-                      ->orderByRaw("CASE WHEN vendors.vendor_type = '$favoriteType' THEN 0 ELSE 1 END")
-                      ->orderBy('offers.expiration_time', 'asc');
-            } else {
-                $query->orderBy('offers.expiration_time', 'asc');
-            }
+            return response()->json([
+                'status' => 'success',
+                'data' => $fallbackOffers
+            ]);
         }
 
-        // جلب أعلى 10 عروض مخصصة وذكية بالملّي للزبون ده
-        $recommendedOffers = $query->take(10)->get();
+        try {
+            // 2️⃣ السحر الأول: نكتشف "ذوق مصلحة الزبون" بناءً على تاريخ أوردراته السابقة
+            // بنعمل Join بين الأوردرات، العروض، الفروع، وجدول الفيندورز عشان نعرف الـ vendor_type المفضل
+            $userPreference = order::where('orders.user_id', $user->id)
+                ->join('offers', 'orders.offer_id', '=', 'offers.id')
+                ->join('branches', 'offers.branch_id', '=', 'branches.id')
+                ->join('vendors', 'branches.vendor_id', '=', 'vendors.id')
+                ->select('vendors.vendor_type', \DB::raw('COUNT(*) as order_count'))
+                ->groupBy('vendors.vendor_type')
+                ->orderBy('order_count', 'desc') // الأعلى شراءً في الصدارة
+                ->first(); // بناخد التايب رقم 1 المفضل عنده
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Smart personalized recommendations fetched successfully',
-            'detected_favorite_category' => $favoriteType ?? 'No history yet (New User)',
-            'data' => $recommendedOffers
-        ]);
+            $favoriteType = $userPreference ? $userPreference->vendor_type : null;
 
-    } catch (Exception $e) {
-        // خطة بديلة (Fallback) عشان الـ App ميموتش لو حصل أي غلطة في حسابات الـ SQL المعقدة
-        return response()->json([
-            'status' => 'success',
-            'data' => offer::where('status', 'active')->where('expiration_time', '>', now())->latest()->take(10)->get(),
-            'debug_error' => $e->getMessage()
-        ]);
+            // 3️⃣ بناء الاستعلام الأساسي لعروض الأبلكيشن النشطة حالياً
+            $query = offer::query()->select('offers.id', 'offers.title', 'offers.description', 'offers.image', 'offers.original_price', 'offers.discount_price', 'offers.expiration_time', 'offers.status', 'offers.branch_id', 'offers.created_at')
+                ->with([
+                    'branch:id,branch_name,store_address,lat,long,vendor_id',
+                    'branch.vendor:id,business_name,logo,vendor_type'
+                ])
+                ->where('offers.status', 'active')
+                ->where('expiration_time', '>', now());
+
+            // 4️⃣ السحر الثاني: دمج "الموقع" مع "ذوق الزبون الشرائي" في الترتيب (Scoring)
+            if ($request->filled('lat') && $request->filled('long')) {
+                $lat = $request->lat;
+                $lon = $request->long;
+
+                // بنربط الجداول عشان نحسب المسافة ونعرف نوع المحل لكل عرض
+                $query->join('branches', 'offers.branch_id', '=', 'branches.id')
+                    ->join('vendors', 'branches.vendor_id', '=', 'vendors.id');
+
+                // حساب المسافة الجغرافية بالكيلومتر (Haversine Formula)
+                $distanceSql = "(6371 * acos(cos(radians($lat)) * cos(radians(branches.lat)) * cos(radians(branches.long) - radians($lon)) + sin(radians($lat)) * sin(radians(branches.lat))))";
+                $query->addSelect(\DB::raw("$distanceSql AS distance"));
+
+                // حساب الـ Score الذكي:
+                // لو نوع الفيندور بتاع العرض هو نفس الـ favoriteType اللي الزبون بيحبه دايماً، العرض ياخد +15 نقطة فوراً!
+                // ونطرح منه المسافة عشان العروض الأقرب تاخد نقاط أعلى برضه
+                $favoriteTypeCondition = $favoriteType ? "'$favoriteType'" : "'none'";
+                $scoreSql = "CASE WHEN vendors.vendor_type = $favoriteTypeCondition THEN 15 ELSE 0 END - ($distanceSql * 1.5)";
+
+                $query->addSelect(\DB::raw("($scoreSql) AS recommendation_score"))
+                    ->orderBy('recommendation_score', 'desc'); // الترتيب من الأعلى سكور للأقل
+
+            } else {
+                // 5️⃣ لو قافل الـ GPS أو قاعدين في مكان مجهول، هنرتب بناءً على ذوقه الشرائي دايماً ثم قرب انتهاء الوقت
+                if ($favoriteType) {
+                    $query->join('branches', 'offers.branch_id', '=', 'branches.id')
+                        ->join('vendors', 'branches.vendor_id', '=', 'vendors.id')
+                        ->orderByRaw("CASE WHEN vendors.vendor_type = '$favoriteType' THEN 0 ELSE 1 END")
+                        ->orderBy('offers.expiration_time', 'asc');
+                } else {
+                    $query->orderBy('offers.expiration_time', 'asc');
+                }
+            }
+
+            // جلب أعلى 10 عروض مخصصة وذكية بالملّي للزبون ده
+            $recommendedOffers = $query->take(10)->get();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Smart personalized recommendations fetched successfully',
+                'detected_favorite_category' => $favoriteType ?? 'No history yet (New User)',
+                'data' => $recommendedOffers
+            ]);
+
+        } catch (Exception $e) {
+            // خطة بديلة (Fallback) عشان الـ App ميموتش لو حصل أي غلطة في حسابات الـ SQL المعقدة
+            return response()->json([
+                'status' => 'success',
+                'data' => offer::where('status', 'active')->where('expiration_time', '>', now())->latest()->take(10)->get(),
+                'debug_error' => $e->getMessage()
+            ]);
+        }
     }
-}
 
     /**
      * 2. إضافة عرض جديد (مربوط بفرع)
@@ -231,7 +231,14 @@ class OfferController extends Controller
         }
 
         if ($request->hasFile('image')) {
-            $data['image'] = $request->file('image')->store('offers', 'public');
+            $file = $request->file('image');
+            // بنعمل اسم فريد للصورة عشان الصور متمسحش بعضها
+            $filename = time() . '_' . $file->getClientOriginalName();
+            // بننقل الصورة لفولدر public/uploads/offers مباشرة
+            $file->move(public_path('uploads/offers'), $filename);
+
+            // بنسجل المسار النظيف ده جوه الـ داتا اللي هتروح للداتابيز
+            $data['image'] = 'uploads/offers/' . $filename;
         }
 
         // إنشاء العرض تحت الفرع
@@ -247,6 +254,7 @@ class OfferController extends Controller
                 'is_read' => 0,
             ]);
         }
+        $offer->image = asset($offer->image);
 
         return response()->json(['message' => 'Offer created successfully!', 'offer' => $offer], 201);
     }
