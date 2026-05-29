@@ -320,32 +320,42 @@ class VendorController extends Controller
     }
     public function getOrdersForMe()
     {
-        // 1. التأكد من أن المستخدم الحالي هو فيندور والحصول على بيانات التاجر الخاصة به
-        $vendor = auth()->user()->vendor;
+        try {
+            // 1. التأكد من أن المستخدم الحالي هو فيندور والحصول على بيانات التاجر الخاصة به
+            $vendor = auth()->user()->vendor;
 
-        if (!$vendor) {
+            if (!$vendor) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Vendor profile not found'
+                ], 404);
+            }
+
+            // 2. جلب الأوردرات المرتبطة بهذا التاجر مباشرة
+            // استخدمنا Eager Loading (with) لجلب بيانات العميل والفرع والأصناف في طلب واحد
+            $orders = order::where('vendor_id', $vendor->id)
+                ->with([
+                    'customer:id,name,phone',        // جلب بيانات العميل الأساسية فقط
+                    'branch:id,branch_name,store_address', // 🟢 تم تصليح name إلى branch_name
+                    'items.offer:id,title,discount_price'    // 🟢 تم تصليح price إلى discount_price
+                ])
+                ->orderByDesc('created_at') // ترتيب من الأحدث للأقدم
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'count' => $orders->count(),
+                'data' => $orders
+            ]);
+        } catch (\Exception $e) {
+            // 🟢 دي عشان لو ضربت تاني تطلع لك رسالة بالسبب بالظبط بدل صفحة الـ HTML
             return response()->json([
                 'success' => false,
-                'message' => 'Vendor profile not found'
-            ], 404);
+                'message' => 'Error inside getOrdersForMe',
+                'error_debug' => $e->getMessage(),
+                'line' => $e->getLine()
+            ], 500);
         }
-
-        // 2. جلب الأوردرات المرتبطة بهذا التاجر مباشرة
-        // استخدمنا Eager Loading (with) لجلب بيانات العميل والفرع والأصناف في طلب واحد
-        $orders = order::where('vendor_id', $vendor->id)
-            ->with([
-                'customer:id,name,phone',        // جلب بيانات العميل الأساسية فقط
-                'branch:id,branch_name,store_address', // 🟢 تم تصليح name إلى branch_name
-                'items.offer:id,title,discount_price'    // 🟢 تم تصليح price إلى discount_price
-            ])
-            ->orderByDesc('created_at') // ترتيب من الأحدث للأقدم
-            ->get();
-
-        return response()->json([
-            'success' => true,
-            'count' => $orders->count(),
-            'data' => $orders
-        ]);
     }
 
     public function offerReviews()
