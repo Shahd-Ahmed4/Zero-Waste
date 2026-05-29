@@ -15,100 +15,113 @@ class OfferController extends Controller
      */
     public function index(Request $request)
     {
-        $user = auth('sanctum')->user();
+        try {
+            $user = auth('sanctum')->user();
 
-        // 1. نبدأ بـ Query أساسي ونحدد صراحة أننا نريد معرف العرض أولاً لتجنب تضارب الجداول
-        $query = offer::query()->select('offers.id', 'offers.title', 'offers.description', 'offers.image', 'offers.original_price', 'offers.discount_price', 'offers.expiration_time', 'offers.status', 'offers.branch_id', 'offers.created_at')
-            ->with([
-                'branch' => function ($q) {
-                    // نضمن دائماً وضع الـ id والـ vendor_id لتنجح العلاقة
-                    $q->select('id', 'branch_name', 'store_address', 'lat', 'long', 'vendor_id');
-                },
-                'branch.vendor:id,business_name,logo'
-            ]);
+            // 1. نبدأ بـ Query أساسي ونحدد صراحة أننا نريد معرف العرض أولاً لتجنب تضارب الجداول
+            $query = offer::query()->select('offers.id', 'offers.title', 'offers.description', 'offers.image', 'offers.original_price', 'offers.discount_price', 'offers.expiration_time', 'offers.status', 'offers.branch_id', 'offers.created_at')
+                ->withAvg('reviews', 'rating')
+                ->with([
+                    'branch' => function ($q) {
+                        // نضمن دائماً وضع الـ id والـ vendor_id لتنجح العلاقة
+                        $q->select('id', 'branch_name', 'store_address', 'lat', 'long', 'vendor_id');
+                    },
+                    'branch.vendor:id,business_name,logo'
+                ]);
 
-        // 2. تصفية للأدمن vs المستخدم العادي
-        if ($user && $user->role === 'admin') {
-            // الأدمن يشوف كله
-        } else {
-            $query->where('offers.status', 'active')
-                ->where('expiration_time', '>', now());
-        }
-
-        // 3. فلتر نوع الفيندور
-        if ($request->filled('vendor_type') && $request->vendor_type !== 'all') {
-            $allowedTypes = ['restaurant', 'bakery', 'cafe', 'supermarket', 'hotel', 'others'];
-
-            if (in_array(strtolower($request->vendor_type), $allowedTypes)) {
-                $query->whereHas('branch.vendor', function ($q) use ($request) {
-                    $q->where('vendor_type', strtolower($request->vendor_type));
-                });
-            }
-        }
-
-        // 4. منطق الترتيب (Sorting) - الدمج الصحيح والآمن هنا
-        if ($request->filled('sort_by')) {
-            switch ($request->sort_by) {
-                case 'distance':
-                    if ($request->filled('lat') && $request->filled('long')) {
-                        $lat = $request->lat;
-                        $lon = $request->long;
-
-                        $query->join('branches', 'offers.branch_id', '=', 'branches.id')
-                            ->addSelect(\DB::raw("(6371 * acos(cos(radians($lat)) * cos(radians(branches.lat)) * cos(radians(branches.long) - radians($lon)) + sin(radians($lat)) * sin(radians(branches.lat)))) AS distance"))
-                            ->orderBy('distance', 'asc');
-                    }
-                    break;
-
-                case 'rating':
-                    $query->withAvg('reviews', 'rating')->orderBy('reviews_avg_rating', 'desc');
-                    break;
-
-                case 'highest_discount':
-                    $query->addSelect(\DB::raw('(original_price - discount_price) as discount_amount'))
-                        ->orderBy('discount_amount', 'desc');
-                    break;
-
-                // 🌟 لو بعت sort_by مش معروفة، بنشغل الترتيب الذكي كـ خيار احتياطي
-                default:
-                    if ($request->filled('lat') && $request->filled('long')) {
-                        $lat = $request->lat;
-                        $lon = $request->long;
-
-                        $query->join('branches', 'offers.branch_id', '=', 'branches.id')
-                            ->addSelect(\DB::raw("(6371 * acos(cos(radians($lat)) * cos(radians(branches.lat)) * cos(radians(branches.long) - radians($lon)) + sin(radians($lat)) * sin(radians(branches.lat)))) AS distance"))
-                            ->addSelect(\DB::raw("TIMESTAMPDIFF(MINUTE, NOW(), offers.expiration_time) AS minutes_left"))
-                            ->orderBy('distance', 'asc')
-                            ->orderBy('minutes_left', 'asc');
-                    } else {
-                        $query->orderBy('offers.expiration_time', 'asc');
-                    }
-                    break;
-            }
-        } else {
-            // 🌟 الترتيب التلقائي الذكي أول ما يفتح الصفحة (بدون sort_by) 🌟
-            if ($request->filled('lat') && $request->filled('long')) {
-                // 1️⃣ الحالة الأولى: لو مدخل اللوكيشن -> يرتب بالأقرب مسافة ثم الأقرب انتهاءً
-                $lat = $request->lat;
-                $lon = $request->long;
-
-                $query->join('branches', 'offers.branch_id', '=', 'branches.id')
-                    ->addSelect(\DB::raw("(6371 * acos(cos(radians($lat)) * cos(radians(branches.lat)) * cos(radians(branches.long) - radians($lon)) + sin(radians($lat)) * sin(radians(branches.lat)))) AS distance"))
-                    ->addSelect(\DB::raw("TIMESTAMPDIFF(MINUTE, NOW(), offers.expiration_time) AS minutes_left"))
-                    ->orderBy('distance', 'asc')
-                    ->orderBy('minutes_left', 'asc');
+            // 2. تصفية للأدمن vs المستخدم العادي
+            if ($user && $user->role === 'admin') {
+                // الأدمن يشوف كله
             } else {
-                // 2️⃣ الحالة الثانية: لو مش مدخل لوكيشن -> يرتب بناءً على الوقت (المنتهي قريباً أولاً)
-                $query->orderBy('offers.expiration_time', 'asc');
+                $query->where('offers.status', 'active')
+                    ->where('expiration_time', '>', now());
             }
+
+            // 3. فلتر نوع الفيندور
+            if ($request->filled('vendor_type') && $request->vendor_type !== 'all') {
+                $allowedTypes = ['restaurant', 'bakery', 'cafe', 'supermarket', 'hotel', 'others'];
+
+                if (in_array(strtolower($request->vendor_type), $allowedTypes)) {
+                    $query->whereHas('branch.vendor', function ($q) use ($request) {
+                        $q->where('vendor_type', strtolower($request->vendor_type));
+                    });
+                }
+            }
+
+            // 4. منطق الترتيب (Sorting) - الدمج الصحيح والآمن هنا
+            if ($request->filled('sort_by')) {
+                switch ($request->sort_by) {
+                    case 'distance':
+                        if ($request->filled('lat') && $request->filled('long')) {
+                            $lat = $request->lat;
+                            $lon = $request->long;
+
+                            $query->join('branches', 'offers.branch_id', '=', 'branches.id')
+                                ->addSelect(\DB::raw("(6371 * acos(cos(radians($lat)) * cos(radians(branches.lat)) * cos(radians(branches.long) - radians($lon)) + sin(radians($lat)) * sin(radians(branches.lat)))) AS distance"))
+                                ->orderBy('distance', 'asc');
+                        }
+                        break;
+
+                    case 'rating':
+                        $query->orderBy('reviews_avg_rating', 'desc');
+                        break;
+
+                    case 'highest_discount':
+                        $query->addSelect(\DB::raw('(original_price - discount_price) as discount_amount'))
+                            ->orderBy('discount_amount', 'desc');
+                        break;
+
+                    // 🌟 لو بعت sort_by مش معروفة، بنشغل الترتيب الذكي كـ خيار احتياطي
+                    default:
+                        if ($request->filled('lat') && $request->filled('long')) {
+                            $lat = $request->lat;
+                            $lon = $request->long;
+
+                            $query->join('branches', 'offers.branch_id', '=', 'branches.id')
+                                ->addSelect(\DB::raw("(6371 * acos(cos(radians($lat)) * cos(radians(branches.lat)) * cos(radians(branches.long) - radians($lon)) + sin(radians($lat)) * sin(radians(branches.lat)))) AS distance"))
+                                ->addSelect(\DB::raw("TIMESTAMPDIFF(MINUTE, NOW(), offers.expiration_time) AS minutes_left"))
+                                ->orderBy('distance', 'asc')
+                                ->orderBy('minutes_left', 'asc');
+                        } else {
+                            $query->orderBy('offers.expiration_time', 'asc');
+                        }
+                        break;
+                }
+            } else {
+                // 🌟 الترتيب التلقائي الذكي أول ما يفتح الصفحة (بدون sort_by) 🌟
+                if ($request->filled('lat') && $request->filled('long')) {
+                    // 1️⃣ الحالة الأولى: لو مدخل اللوكيشن -> يرتب بالأقرب مسافة ثم الأقرب انتهاءً
+                    $lat = $request->lat;
+                    $lon = $request->long;
+
+                    $query->join('branches', 'offers.branch_id', '=', 'branches.id')
+                        ->addSelect(\DB::raw("(6371 * acos(cos(radians($lat)) * cos(radians(branches.lat)) * cos(radians(branches.long) - radians($lon)) + sin(radians($lat)) * sin(radians(branches.lat)))) AS distance"))
+                        ->addSelect(\DB::raw("TIMESTAMPDIFF(MINUTE, NOW(), offers.expiration_time) AS minutes_left"))
+                        ->orderBy('distance', 'asc')
+                        ->orderBy('minutes_left', 'asc');
+                } else {
+                    // 2️⃣ الحالة الثانية: لو مش مدخل لوكيشن -> يرتب بناءً على الوقت (المنتهي قريباً أولاً)
+                    $query->orderBy('offers.expiration_time', 'asc');
+                }
+            }
+
+            $data = $query->get();
+            $data->transform(function ($offer) {
+                $offer->average_rating = $offer->reviews_avg_rating ? round($offer->reviews_avg_rating, 1) : 0;
+                return $offer;
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $data
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Something went wrong while fetching offers!',
+                'error_debug' => $e->getMessage()
+            ], 500);
         }
-
-        $data = $query->get();
-
-        return response()->json([
-            'status' => 'success',
-            'data' => $data
-        ]);
     }
 
     public function getSmartRecommendations(Request $request)

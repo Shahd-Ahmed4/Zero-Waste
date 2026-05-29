@@ -64,6 +64,12 @@ class offer extends Model
     // الـ Accessor اللي بيحسب النجوم (⭐)
     public function getAverageRatingAttribute()
     {
+        // لو الكنترولر حاسب الـ Avg مسبقاً في كويري واحد مجمع، بنستخدمه فوراً ونوفر وقت
+        if (array_key_exists('reviews_avg_rating', $this->attributes)) {
+            return round($this->attributes['reviews_avg_rating'] ?: 0, 1);
+        }
+
+        // لو الـ Controller محسبهاش (زي صفحة الـ Show لتفاصيل عرض واحد)، بيحسبها عادي من الداتابيز
         return round($this->reviews()->avg('rating') ?: 0, 1);
     }
     public function getImageUrlAttribute()
