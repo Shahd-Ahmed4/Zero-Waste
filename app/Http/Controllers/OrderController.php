@@ -24,94 +24,112 @@ class OrderController extends Controller
 
     public function store(Request $request)
     {
-        $customer = customer::where('user_id', auth()->id())->first();
+        try {
+            $customer = customer::where('user_id', auth()->id())->first();
 
-        if (!$customer) {
-            return response()->json(['message' => 'This user does not have a customer account.'], 404);
-        }
-        // 1. التأكد من صحة البيانات المرسلة من الفرونت إند
-        $request->validate([
-            'items' => 'required|array',
-            'payment_method' => 'required|in:card,cash',
-            'delivery_type' => 'required|in:pickup,delivery',
-            'customer_lat' => 'required_if:delivery_type,delivery',
-            'customer_long' => 'required_if:delivery_type,delivery',
-        ]);
-
-        // استخدام الـ Transaction عشان لو حصلت مشكلة في النص، مفيش داتا تضرب
-        return DB::transaction(function () use ($request,$customer) {
-
-            // 2. الوصول لأول عرض عشان نعرف الفرع والفيندور
-            $firstOffer = offer::with('branch.vendor')->findOrFail($request->items[0]['offer_id']);
-            $branch = $firstOffer->branch;
-            $vendor = $branch->vendor;
-
-            // 3. حساب مصاريف التوصيل بناءً على موقع الفرع (Branch)
-            $deliveryFees = 0;
-            if ($request->delivery_type === 'delivery') {
-                $distanceKm = $this->calculateDistance(
-                    $request->customer_lat,
-                    $request->customer_long,
-                    $branch->lat,
-                    $branch->long
-                );
-                // الحد الأدنى للتوصيل 15 جنيه، وكل كيلو بـ 5 جنيه
-                $deliveryFees = max(15, round($distanceKm * 5, 2));
+            if (!$customer) {
+                return response()->json(['message' => 'This user does not have a customer account.'], 404);
             }
-
-            // 4. إنشاء الأوردر الأساسي
-            $order = order::create([
-                'customer_id' => $customer->id,
-                'vendor_id' => $vendor->id,
-                'branch_id' => $branch->id, // ربط الأوردر بالفرع مباشرة
-                'order_status' => 'pending',
-                'delivery_type' => $request->delivery_type,
-                'delivery_address' => $request->delivery_address,
-                'delivery_fees' => $deliveryFees,
-                'payment_method' => $request->payment_method,
-                'total_amount' => 0,
-                'order_date' => now(),
+            // 1. التأكد من صحة البيانات المرسلة من الفرونت إند
+            $request->validate([
+                'items' => 'required|array',
+                'payment_method' => 'required|in:card,cash',
+                'delivery_type' => 'required|in:pickup,delivery',
+                'customer_lat' => 'required_if:delivery_type,delivery',
+                'customer_long' => 'required_if:delivery_type,delivery',
             ]);
 
-            // 5. إضافة الأصناف وخصمها من مخزن الفرع
-            $total = 0;
-            foreach ($request->items as $item) {
-                // عمل Lock على السطر في الداتابيز عشان نمنع تضارب الطلبات في نفس الوقت
-                $offer = offer::lockForUpdate()->find($item['offer_id']);
+            // استخدام الـ Transaction عشان لو حصلت مشكلة في النص، مفيش داتا تضرب
+            return DB::transaction(function () use ($request, $customer) {
 
-                // خصم الكمية من الموديل (تأكدي من وجود ميثود reduceStock في موديل Offer)
-                $offer->reduceStock($item['quantity']);
+                // 2. الوصول لأول عرض عشان نعرف الفرع والفيندور
+                $firstOffer = offer::with('branch.vendor')->findOrFail($request->items[0]['offer_id']);
+                $branch = $firstOffer->branch;
+                $vendor = $branch->vendor;
 
-                $total += ($offer->price * $item['quantity']);
+                // 3. حساب مصاريف التوصيل بناءً على موقع الفرع (Branch)
+                $deliveryFees = 0;
+                if ($request->delivery_type === 'delivery') {
+                    $distanceKm = $this->calculateDistance(
+                        $request->customer_lat,
+                        $request->customer_long,
+                        $branch->lat,
+                        $branch->long
+                    );
+                    // الحد الأدنى للتوصيل 15 جنيه، وكل كيلو بـ 5 جنيه
+                    $deliveryFees = max(15, round($distanceKm * 5, 2));
+                }
 
-                $order->items()->create([
-                    'offer_id' => $offer->id,
-                    'quantity' => $item['quantity'],
-                    'price' => $offer->price,
+                // 4. إنشاء الأوردر الأساسي
+                $order = order::create([
+                    'customer_id' => $customer->id,
+                    'vendor_id' => $vendor->id,
+                    'branch_id' => $branch->id, // ربط الأوردر بالفرع مباشرة
+                    'order_status' => 'pending',
+                    'delivery_type' => $request->delivery_type,
+                    'delivery_address' => $request->delivery_address,
+                    'delivery_fees' => $deliveryFees,
+                    'payment_method' => $request->payment_method,
+                    'total_amount' => 0,
+                    'order_date' => now(),
                 ]);
-            }
 
-            // 6. تحديث إجمالي المبلغ
-            $order->update(['total_amount' => $total + $deliveryFees]);
+                // 5. إضافة الأصناف وخصمها من مخزن الفرع
+                $total = 0;
+                foreach ($request->items as $item) {
+                    // عمل Lock على السطر في الداتابيز عشان نمنع تضارب الطلبات في نفس الوقت
+                    $offer = offer::lockForUpdate()->find($item['offer_id']);
 
-            // 7. التعامل مع الدفع
-            if ($request->payment_method === 'card') {
-                $paymentUrl = $this->paymentService->createCheckoutSession($order);
-                \App\Models\payment::create([
-                    'order_id' => $order->id,
-                    'transaction_id' => $this->paymentService->getLastSessionId(), // الـ ID اللي جاي من Stripe
-                    'amount' => $order->total_amount,
-                    'payment_status' => 'pending',
-                    'payment_method' => 'card'
-                ]);
-                return response()->json(['payment_url' => $paymentUrl], 201);
-            }
+                    // خصم الكمية من الموديل (تأكدي من وجود ميثود reduceStock في موديل Offer)
+                    $offer->reduceStock($item['quantity']);
 
+                    $total += ($offer->price * $item['quantity']);
+
+                    $order->items()->create([
+                        'offer_id' => $offer->id,
+                        'quantity' => $item['quantity'],
+                        'price' => $offer->price,
+                    ]);
+                }
+
+                // 6. تحديث إجمالي المبلغ
+                $order->update(['total_amount' => $total + $deliveryFees]);
+
+                // 7. التعامل مع الدفع
+                if ($request->payment_method === 'card') {
+                    $paymentUrl = $this->paymentService->createCheckoutSession($order);
+                    \App\Models\payment::create([
+                        'order_id' => $order->id,
+                        'transaction_id' => $this->paymentService->getLastSessionId(), // الـ ID اللي جاي من Stripe
+                        'amount' => $order->total_amount,
+                        'payment_status' => 'pending',
+                        'payment_method' => 'card'
+                    ]);
+                    return response()->json(['payment_url' => $paymentUrl], 201);
+                }
+
+                return response()->json([
+                    'message' => 'Order created successfully (Cash)',
+                    'order' => $order->load('items')
+                ], 201);
+            });
+        } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
-                'message' => 'Order created successfully (Cash)',
-                'order' => $order->load('items')
-            ], 201);
-        });
+                'status' => 'error',
+                'message' => 'Validation Failed!',
+                'errors' => $e->errors()
+            ], 422);
+
+        } catch (\Exception $e) {
+            // 🟢 هنا السر! الـ 500 هتتحول لرسالة مقروءة هتقولهم بالملي إيه اللي ضرب جوه الكود
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Something went wrong while placing the order!',
+                'error_debug' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile()
+            ], 500);
+        }
     }
 
     public function updateStatus(Request $request, $id)
