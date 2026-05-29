@@ -306,13 +306,16 @@ class OfferController extends Controller
             return response()->json(['message' => 'Invalid branch ID'], 403);
         }
         if ($request->hasFile('image')) {
-            // بنخزن الصورة في فولدر offers وبنحدث قيمة image في الـ data
-            $data['image'] = $request->file('image')->store('offers', 'public');
+            $file = $request->file('image');
+            $filename = time() . '_' . $file->getClientOriginalName();
+            $file->move(public_path('uploads/offers'), $filename);
 
-            $offer->update($data);
-
-            return response()->json(['status' => 'success', 'offer' => $offer]);
+            $data['image'] = 'uploads/offers/' . $filename;
         }
+        $offer->update($data);
+        $offer->image = asset($offer->image);
+
+        return response()->json(['status' => 'success', 'offer' => $offer]);
     }
 
     /**

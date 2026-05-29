@@ -57,8 +57,11 @@ class ReviewController extends Controller
         }
         $imagePath = null;
         if ($request->hasFile('image')) {
-            // بنرفع الصورة في فولدر reviews
-            $imagePath = $request->file('image')->store('reviews', 'public');
+            $file = $request->file('image');
+            $filename = time() . '_' . $file->getClientOriginalName();
+            $file->move(public_path('uploads/reviews'), $filename);
+
+            $imagePath = 'uploads/reviews/' . $filename;
         }
 
         // 4. Save the review using the customer_id
@@ -70,6 +73,9 @@ class ReviewController extends Controller
             'image' => $imagePath,  // تخزين مسار الصورة
             'is_visible' => true,        // بيظهر أوتوماتيك إلا لو الأدمن أخفاه
         ]);
+        if ($review->image) {
+            $review->image = asset($review->image);
+        }
 
         return response()->json([
             'message' => 'Review submitted successfully! Thank you for your feedback.',

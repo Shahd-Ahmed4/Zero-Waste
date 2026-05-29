@@ -120,19 +120,19 @@ class VendorController extends Controller
 
         // 3. رفع السجل التجاري
         if ($request->hasFile('commercial_register')) {
-        $crFile = $request->file('commercial_register');
-        $crName = time() . '_cr_' . $crFile->getClientOriginalName();
-        $crFile->move(public_path('uploads/vendors/docs'), $crName);
-        $vendor->commercial_register = 'uploads/vendors/docs/' . $crName;
-    }
+            $crFile = $request->file('commercial_register');
+            $crName = time() . '_cr_' . $crFile->getClientOriginalName();
+            $crFile->move(public_path('uploads/vendors/docs'), $crName);
+            $vendor->commercial_register = 'uploads/vendors/docs/' . $crName;
+        }
 
         // 4. رفع البطاقة الضريبية
         if ($request->hasFile('tax_card')) {
-        $tcFile = $request->file('tax_card');
-        $tcName = time() . '_tc_' . $tcFile->getClientOriginalName();
-        $tcFile->move(public_path('uploads/vendors/docs'), $tcName);
-        $vendor->tax_card = 'uploads/vendors/docs/' . $tcName;
-    }
+            $tcFile = $request->file('tax_card');
+            $tcName = time() . '_tc_' . $tcFile->getClientOriginalName();
+            $tcFile->move(public_path('uploads/vendors/docs'), $tcName);
+            $vendor->tax_card = 'uploads/vendors/docs/' . $tcName;
+        }
 
         // 5. حفظ باقي البيانات النصية
         $vendor->update([
@@ -225,17 +225,26 @@ class VendorController extends Controller
         $data = $request->only(['business_name', 'tax_number']);
         // برفع اللوجو لو موجود
         if ($request->hasFile('logo')) {
-            $data['logo'] = $request->file('logo')->store('vendors/logos', 'public');
+            $logoFile = $request->file('logo');
+            $logoName = time() . '_logo_' . $logoFile->getClientOriginalName();
+            $logoFile->move(public_path('uploads/vendors/logos'), $logoName);
+            $data['logo'] = 'uploads/vendors/logos/' . $logoName;
         }
 
-        // برفع الملفات لو موجودة
+        // 🟢 2. تعديل رفع السجل التجاري لـ public المباشر
         if ($request->hasFile('commercial_register')) {
-            $data['commercial_register'] = $request->file('commercial_register')->store('vendors/docs', 'public');
+            $crFile = $request->file('commercial_register');
+            $crName = time() . '_cr_' . $crFile->getClientOriginalName();
+            $crFile->move(public_path('uploads/vendors/docs'), $crName);
+            $data['commercial_register'] = 'uploads/vendors/docs/' . $crName;
         }
 
-        // 4. هندلة البطاقة الضريبية
+        // 🟢 3. تعديل رفع البطاقة الضريبية لـ public المباشر
         if ($request->hasFile('tax_card')) {
-            $data['tax_card'] = $request->file('tax_card')->store('vendors/docs', 'public');
+            $tcFile = $request->file('tax_card');
+            $tcName = time() . '_tc_' . $tcFile->getClientOriginalName();
+            $tcFile->move(public_path('uploads/vendors/docs'), $tcName);
+            $data['tax_card'] = 'uploads/vendors/docs/' . $tcName;
         }
 
         $vendor->update($data);
