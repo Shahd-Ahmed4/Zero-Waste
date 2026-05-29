@@ -335,7 +335,8 @@ class VendorController extends Controller
             // استخدمنا Eager Loading (with) لجلب بيانات العميل والفرع والأصناف في طلب واحد
             $orders = order::where('vendor_id', $vendor->id)
                 ->with([
-                    'customer:id,name,phone',        // جلب بيانات العميل الأساسية فقط
+                    'customer:id,user_id',                         // 🟢 جلب الـ customer ومعه الـ user_id الأساسي للربط
+                    'customer.user:id,name,phone',
                     'branch:id,branch_name,store_address', // 🟢 تم تصليح name إلى branch_name
                     'items.offer:id,title,discount_price'    // 🟢 تم تصليح price إلى discount_price
                 ])
