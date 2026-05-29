@@ -113,6 +113,7 @@ class OrderSeeder extends Seeder
                 'order_id' => $order->id,
                 'offer_id' => $offer->id,
                 'price' => $itemPrice,
+                'original_price' => $offer->original_price, // 👈 التعديل المنقذ هنا! سحبنا السعر الأصلي المطلوب من العرض
                 'quantity' => $quantity,
             ]);
 
