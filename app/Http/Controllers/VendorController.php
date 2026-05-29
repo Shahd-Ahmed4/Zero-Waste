@@ -335,8 +335,8 @@ class VendorController extends Controller
         $orders = order::where('vendor_id', $vendor->id)
             ->with([
                 'customer:id,name,phone',        // جلب بيانات العميل الأساسية فقط
-                'branch:id,name,store_address', // معرفة الأوردر طالع من أنهي فرع
-                'items.offer:id,title,price'    // تفاصيل العروض المطلوبة في الأوردر
+                'branch:id,branch_name,store_address', // 🟢 تم تصليح name إلى branch_name
+                'items.offer:id,title,discount_price'    // 🟢 تم تصليح price إلى discount_price
             ])
             ->orderByDesc('created_at') // ترتيب من الأحدث للأقدم
             ->get();
