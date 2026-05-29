@@ -243,6 +243,12 @@ class OfferController extends Controller
                 $file->move(public_path('uploads/offers'), $filename);
                 $data['image'] = 'uploads/offers/' . $filename;
             }
+            // Add this right before: $offer = $branch->offers()->create($data);
+            if (isset($data['expiration_time'])) {
+                $data['expiration_time'] = date('Y-m-d H:i:s', strtotime($data['expiration_time']));
+            }
+
+            $offer = $branch->offers()->create($data);
 
             // 4. إنشاء العرض تحت الفرع
             $offer = $branch->offers()->create($data);
