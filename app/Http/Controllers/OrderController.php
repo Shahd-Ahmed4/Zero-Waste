@@ -82,13 +82,14 @@ class OrderController extends Controller
 
                     // خصم الكمية من الموديل (تأكدي من وجود ميثود reduceStock في موديل Offer)
                     $offer->reduceStock($item['quantity']);
+                    $itemPrice = $offer->discount_price;
 
-                    $total += ($offer->price * $item['quantity']);
+                    $total += ($itemPrice * $item['quantity']);
 
                     $order->items()->create([
                         'offer_id' => $offer->id,
                         'quantity' => $item['quantity'],
-                        'price' => $offer->price,
+                        'price' => $itemPrice,
                     ]);
                 }
 
