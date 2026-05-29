@@ -308,13 +308,15 @@ class OfferController extends Controller
         if ($request->hasFile('image')) {
             $file = $request->file('image');
             $filename = time() . '_' . $file->getClientOriginalName();
-            $file->move(public_path('uploads/offers'), $filename);
+            $destinationPath = public_path('uploads/offers');
+            if (!file_exists($destinationPath)) {
+                mkdir($destinationPath, 0755, true);
+            }
 
+            $file->move($destinationPath, $filename);
             $data['image'] = 'uploads/offers/' . $filename;
         }
         $offer->update($data);
-        $offer->image = asset($offer->image);
-
         return response()->json(['status' => 'success', 'offer' => $offer]);
     }
 
