@@ -351,6 +351,9 @@ class OfferController extends Controller
             $file->move($destinationPath, $filename);
             $data['image'] = 'uploads/offers/' . $filename;
         }
+        if (isset($data['expiration_time'])) {
+            $data['expiration_time'] = date('Y-m-d H:i:s', strtotime($data['expiration_time']));
+        }
         $offer->update($data);
         return response()->json(['status' => 'success', 'offer' => $offer]);
     }
