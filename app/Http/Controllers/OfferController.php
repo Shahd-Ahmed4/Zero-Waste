@@ -383,15 +383,26 @@ class OfferController extends Controller
      */
     public function destroy($id)
     {
-        $offer = offer::findOrFail($id);
-        $vendor = Auth::user()->vendor;
+        try {
+            $offer = offer::findOrFail($id);
+            $vendor = Auth::user()->vendor;
 
-        if ($offer->branch->vendor_id === $vendor->id) {
-            $offer->delete();
-            return response()->json(['message' => 'Offer deleted successfully']);
+            if ($offer->branch->vendor_id === $vendor->id) {
+                $offer->delete();
+                return response()->json(['message' => 'Offer deleted successfully']);
+            }
+
+            return response()->json(['message' => 'Unauthorized!'], 403);
+        } catch (\Exception $e) {
+            // لو حصل أي لغم، هيرجع للفرونت إند السبب الفعلي في ثانية
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Something went wrong while deleting!',
+                'error_debug' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile()
+            ], 500);
         }
-
-        return response()->json(['message' => 'Unauthorized!'], 403);
     }
 
     /**
