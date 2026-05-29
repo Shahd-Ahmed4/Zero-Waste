@@ -19,6 +19,7 @@ return new class extends Migration {
             $table->enum('delivery_type', ['pickup', 'delivery']);
             $table->string('delivery_address')->nullable();
             $table->decimal('delivery_fees', 8, 2)->default(0);
+            $table->decimal('commission_fee', 10, 2)->default(0);
             $table->decimal('total_amount', 10, 2);
             $table->enum('payment_method', ['card', 'cash']);
             $table->timestamp('order_date')->useCurrent();

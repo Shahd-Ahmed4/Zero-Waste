@@ -29,6 +29,25 @@ class offer extends Model
     // السطر ده بيخلي الـ Average Rating يظهر في الـ API أوتوماتيك
     protected $appends = ['average_rating', 'image_url'];
 
+    protected $casts = [
+        'expiration_time' => 'datetime',
+    ];
+
+    protected static function booted()
+    {
+        static::saving(function ($offer) {
+            // لو الكمية خلصت أو بقت صفر، اقلب الحالة تلقائياً لـ disabled
+            if ($offer->quantity_available <= 0) {
+                $offer->status = 'disabled';
+            }
+
+            // حماية إضافية: لو الوقت عدى اقلبها expired
+            if ($offer->expiration_time && $offer->expiration_time->isPast()) {
+                $offer->status = 'expired';
+            }
+        });
+    }
+
     public function branch()
     {
         return $this->belongsTo(branch::class); // كل Offer مرتبط بـ branch واحد

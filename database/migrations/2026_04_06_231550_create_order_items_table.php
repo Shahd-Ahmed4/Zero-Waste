@@ -15,7 +15,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('order_id')->constrained()->onDelete('cascade');
             $table->foreignId('offer_id')->constrained();
-            $table->decimal('price',10,2);
+            $table->decimal('original_price', 10, 2); // السعر الأصلي وقت الشراء
+            $table->decimal('price',10,2);  // سعر الخصم الفعلي اللي الزبون دفعه
             $table->integer('quantity');
             $table->timestamps();
         });

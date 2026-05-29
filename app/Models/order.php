@@ -17,6 +17,7 @@ class order extends Model
         'delivery_type',   // ضيفي ده
         'delivery_address',// ضيفي ده
         'delivery_fees',   // ضيفي ده
+        'commission_fee',
         'total_amount',
         'payment_method',
         'order_date'

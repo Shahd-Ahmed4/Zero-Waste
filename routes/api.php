@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\API\SustainabilityController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\CustomerController;
@@ -66,6 +67,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/branches/{id}', [BranchController::class, 'update']);   // تحديث بيانات فرع
         Route::delete('/branches/{id}', [BranchController::class, 'destroy']); // حذف فرع
         Route::get('/branches/{id}/all-orders', [BranchController::class, 'allOrders']); // روت إضافي لرؤية كل الطلبات بالتفصيل
+        Route::get('/vendor/sustainability/metrics', [SustainabilityController::class, 'getVendorMetrics']);
+
 
     });
 });
@@ -78,6 +81,8 @@ Route::middleware(['auth:sanctum', 'checkadmin'])->group(function () {
     Route::get('/admin/customers', [AdminController::class, 'index']);
     Route::get('/admin/customers/{id}', [AdminController::class, 'show']);
     Route::get('/admin/all-orders', [AdminController::class, 'listAllOrders']);
+    Route::get('/admin/sustainability/metrics', [SustainabilityController::class, 'getAdminMetrics']);
+
 
     Route::middleware(['checkadmin:super_admin,manager'])->group(function () {
         Route::put('/profile', [AdminController::class, 'updateProfile']);
@@ -122,6 +127,8 @@ Route::middleware(['auth:sanctum', 'checkcustomer'])->group(function () {
     Route::delete('/reviews/{id}', [ReviewController::class, 'destroy']);
     Route::post('/favorites/toggle', [FavoriteController::class, 'toggleFavorite']);
     Route::get('/favorites', [FavoriteController::class, 'getFavorites']);
+    Route::get('/customer/sustainability/metrics', [SustainabilityController::class, 'getCustomerMetrics']);
+
 });
 
 

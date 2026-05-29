@@ -34,6 +34,7 @@ class OfferController extends Controller
                 // الأدمن يشوف كله
             } else {
                 $query->where('offers.status', 'active')
+                    ->where('quantity_available', '>', 0) // <-- ده السطر اللي ضفناه للكمية
                     ->where('expiration_time', '>', now());
             }
 

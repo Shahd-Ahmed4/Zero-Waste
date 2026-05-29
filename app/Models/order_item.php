@@ -11,6 +11,7 @@ class order_item extends Model
     protected $fillable=[
         'order_id',
         'offer_id',
+        'original_price', // ضيفي دي هنا
         'price',
         'quantity'
     ];

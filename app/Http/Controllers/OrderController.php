@@ -69,6 +69,7 @@ class OrderController extends Controller
                     'delivery_type' => $request->delivery_type,
                     'delivery_address' => $request->delivery_address,
                     'delivery_fees' => $deliveryFees,
+                    'commission_fee' => 0, // قيمة مبدئية
                     'payment_method' => $request->payment_method,
                     'total_amount' => 0,
                     'order_date' => now(),
@@ -89,12 +90,19 @@ class OrderController extends Controller
                     $order->items()->create([
                         'offer_id' => $offer->id,
                         'quantity' => $item['quantity'],
+                        'original_price' => $offer->original_price, // <- السعر الأصلي سحبناه من العرض وتثبت هنا
                         'price' => $itemPrice,
                     ]);
                 }
+                // 🧮 6. حسبة العمولة بدقة (6% من إجمالي تمن الأكل الصافي)
+                $customerCommission = round($total * 0.06, 2);
+                // إجمالي المبلغ النهائي الشامل (الأكل + عمولتنا + الدليفري)
+                $finalTotalAmount = $total + $customerCommission + $deliveryFees;
 
-                // 6. تحديث إجمالي المبلغ
-                $order->update(['total_amount' => $total + $deliveryFees]);
+                $order->update([
+                    'commission_fee' => $customerCommission, // 👈 حفظنا قيمة الـ 6% لوحدها بالفلس
+                    'total_amount' => $finalTotalAmount
+                ]);
 
                 // 7. التعامل مع الدفع
                 if ($request->payment_method === 'card') {

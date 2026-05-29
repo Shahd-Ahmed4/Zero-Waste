@@ -211,13 +211,14 @@ class VendorController extends Controller
             'name' => 'sometimes|string|max:255',
             'email' => 'sometimes|email|unique:users,email,' . $user->id,
             'phone' => 'sometimes|string|max:20',
+            'address' => 'sometimes|string|max:500', // 👈 حقل العنوان النصي
             'business_name' => 'sometimes|string|max:255',
             'logo' => 'sometimes|image|mimes:jpeg,png,jpg|max:2048',
             'commercial_register' => 'sometimes|mimes:pdf,jpg,png,jpeg|max:5120',
             'tax_card' => 'sometimes|mimes:pdf,jpg,png,jpeg|max:5120',
             'tax_number' => 'sometimes|nullable|string|max:100'
         ]);
-        $userData = $request->only(['name', 'email', 'phone']);
+        $userData = $request->only(['name', 'email', 'phone','address']);
         if (!empty($userData)) {
             $user->update($userData);
         }
