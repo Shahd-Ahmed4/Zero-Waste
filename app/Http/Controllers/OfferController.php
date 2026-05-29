@@ -107,7 +107,12 @@ class OfferController extends Controller
 
             $data = $query->get();
             $data->transform(function ($offer) {
-                $offer->average_rating = $offer->reviews_avg_rating ? round($offer->reviews_avg_rating, 1) : 0;
+                if (isset($offer->reviews_avg_rating)) {
+                    $offer->average_rating = round($offer->reviews_avg_rating ?: 0, 1);
+                } else {
+                    // 🟡 احتياطي لو لارافيل خزنها في العلاقة مباشرة
+                    $offer->average_rating = round($offer->reviews()->avg('rating') ?: 0, 1);
+                }
                 return $offer;
             });
 

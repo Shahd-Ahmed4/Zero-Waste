@@ -58,7 +58,7 @@ class offer extends Model
     }
     public function reviews()
     {
-        return $this->hasMany(review::class);
+        return $this->hasMany(review::class, 'offer_id');
     }
 
     // الـ Accessor اللي بيحسب النجوم (⭐)
