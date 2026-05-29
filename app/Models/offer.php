@@ -69,7 +69,16 @@ class offer extends Model
     public function getImageUrlAttribute()
     {
         if ($this->image) {
-            // بيرجع لينك زي: http://127.0.0.1:8000/storage/offers/example.jpg
+            if (filter_var($this->image, FILTER_VALIDATE_URL)) {
+                return $this->image;
+            }
+
+            // 2. لو المسار جوه الـ uploads الجديد (بتاعنا المباشر)
+            if (str_starts_with($this->image, 'uploads/')) {
+                return asset($this->image);
+            }
+
+            // 3. ده عشان الصور القديمة اللي لسه متخزنة جوه الـ storage ومتمسحتش تشتغل برضه
             return asset('storage/' . $this->image);
         }
 
