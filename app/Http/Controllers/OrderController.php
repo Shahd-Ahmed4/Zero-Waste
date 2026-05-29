@@ -263,18 +263,37 @@ class OrderController extends Controller
      */
     public function index()
     {
-        // 1. بنجيب كل الأوردرات اللي تخص الكاستمر ده بس
-        // بنستخدم with عشان نجيب بيانات العروض معاها (Eager Loading)
-        $orders = order::where('customer_id', auth()->id())
-            ->with(['items.offer'])
-            ->orderByDesc('created_at') // الأحدث يظهر في الأول
-            ->get();
+        try {
+            // 1. بنجيب حساب الكاستمر المرتبط باليوزر اللي عامل Login حالياً
+            $customer = customer::where('user_id', auth()->id())->first();
 
-        // 2. بنرجع الأوردرات في JSON
-        return response()->json([
-            'success' => true,
-            'count' => $orders->count(),
-            'data' => $orders
-        ]);
+            // لو لسبب ما اليوزر ده ملوش حساب كاستمر
+            if (!$customer) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Customer profile not found.'
+                ], 404);
+            }
+
+            // 2. بنجيب الأوردرات باستخدام الـ customer->id الصح بتاعه من جدول الكاستمرز
+            $orders = order::where('customer_id', $customer->id)
+                ->with(['items.offer'])
+                ->orderByDesc('created_at') // الأحدث يظهر في الأول
+                ->get();
+
+            // 3. بنرجع الأوردرات في JSON والـ count هنا هيطلع رقمها الحقيقي
+            return response()->json([
+                'success' => true,
+                'count' => $orders->count(),
+                'data' => $orders
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Something went wrong!',
+                'error_debug' => $e->getMessage()
+            ], 500);
+        }
     }
 }
