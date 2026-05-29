@@ -211,52 +211,81 @@ class OfferController extends Controller
      */
     public function store(Request $request)
     {
-        $data = $request->validate([
-            'branch_id' => 'required|exists:branches,id', // لازم نحدد الفرع
-            'title' => 'required|string',
-            'description' => 'required|string',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
-            'quantity_available' => 'required|integer|min:1',
-            'original_price' => 'required|numeric',
-            'discount_price' => 'required|numeric|lt:original_price',
-            'expiration_time' => 'required|date|after:now',
-        ]);
-
-        $vendor = Auth::user()->vendor;
-        // التأكد إن الفرع يخص التاجر ده
-        $branch = $vendor->branches()->find($request->branch_id);
-
-        if (!$branch) {
-            return response()->json(['message' => 'Unauthorized: This branch does not belong to you!'], 403);
-        }
-
-        if ($request->hasFile('image')) {
-            $file = $request->file('image');
-            // بنعمل اسم فريد للصورة عشان الصور متمسحش بعضها
-            $filename = time() . '_' . $file->getClientOriginalName();
-            // بننقل الصورة لفولدر public/uploads/offers مباشرة
-            $file->move(public_path('uploads/offers'), $filename);
-
-            // بنسجل المسار النظيف ده جوه الـ داتا اللي هتروح للداتابيز
-            $data['image'] = 'uploads/offers/' . $filename;
-        }
-
-        // إنشاء العرض تحت الفرع
-        $offer = $branch->offers()->create($data);
-
-        // تنبيه العملاء (Notification)
-        $customers = \App\Models\customer::all();
-        foreach ($customers as $customer) {
-            \App\Models\notification::create([
-                'user_id' => $customer->user_id,
-                'message' => "New Offer from {$vendor->business_name} at branch {$branch->branch_name}: {$offer->title}!",
-                'type' => 'alert',
-                'is_read' => 0,
+        try {
+            // 1. عمل الـ Validation
+            $data = $request->validate([
+                'branch_id' => 'required|exists:branches,id',
+                'title' => 'required|string',
+                'description' => 'required|string',
+                'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
+                'quantity_available' => 'required|integer|min:1',
+                'original_price' => 'required|numeric',
+                'discount_price' => 'required|numeric|lt:original_price',
+                'expiration_time' => 'required|date|after:now',
             ]);
-        }
-        $offer->image = asset($offer->image);
 
-        return response()->json(['message' => 'Offer created successfully!', 'offer' => $offer], 201);
+            $vendor = Auth::user()->vendor;
+
+            // 2. التأكد إن الفرع يخص التاجر ده
+            $branch = $vendor->branches()->find($request->branch_id);
+
+            if (!$branch) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized: This branch does not belong to you!'
+                ], 403);
+            }
+
+            // 3. رفع الصورة
+            if ($request->hasFile('image')) {
+                $file = $request->file('image');
+                $filename = time() . '_' . $file->getClientOriginalName();
+                $file->move(public_path('uploads/offers'), $filename);
+                $data['image'] = 'uploads/offers/' . $filename;
+            }
+
+            // 4. إنشاء العرض تحت الفرع
+            $offer = $branch->offers()->create($data);
+
+            // 5. تنبيه العملاء (Notification)
+            $customers = \App\Models\customer::all();
+            foreach ($customers as $customer) {
+                \App\Models\notification::create([
+                    'user_id' => $customer->user_id,
+                    'message' => "New Offer from {$vendor->business_name} at branch {$branch->branch_name}: {$offer->title}!",
+                    'type' => 'alert',
+                    'is_read' => 0,
+                ]);
+            }
+
+            // تحضير رابط الصورة النهائي في الـ Response
+            if ($offer->image) {
+                $offer->image = asset($offer->image);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Offer created successfully!',
+                'offer' => $offer
+            ], 201);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // 🟢 لو المشكلة في الـ Validation (بيانات ناقصة أو غلط)، هيرجع الـ Errors بالملي للفرونت إند
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation Failed!',
+                'errors' => $e->errors() // هيرجع لستة بكل الحقول اللي مسببة الـ 422
+            ], 422);
+
+        } catch (\Exception $e) {
+            // 🔴 لو حصل أي خطأ تاني غير متوقع (مشكلة داتابيز، سيرفر، إلخ)
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Something went wrong on the server!',
+                'error_debug' => $e->getMessage(), // السطر السحري اللي هيطبعلهم نص الخطأ الفعلي
+                'line' => $e->getLine() // هيقولهم رقم السطر اللي ضارب في الكود عندك
+            ], 500);
+        }
     }
 
     /**
