@@ -106,8 +106,25 @@ class OrderController extends Controller
                         'payment_status' => 'pending',
                         'payment_method' => 'card'
                     ]);
+                    \App\Models\notification::create([
+                        'user_id' => $customer->user_id,
+                        'message' => "Order #{$order->id} created! Please complete your card payment via the link.",
+                        'type' => 'order',
+                    ]);
                     return response()->json(['payment_url' => $paymentUrl], 201);
                 }
+                // 🔔 إشعار للعميل في حالة الـ Cash إن الأوردر نجح ومستني التاجر
+                \App\Models\notification::create([
+                    'user_id' => $customer->user_id,
+                    'message' => "Your order #{$order->id} has been placed successfully and is waiting for vendor approval.",
+                    'type' => 'order',
+                ]);
+                // 🔔 إشعار للفيندور (التاجر) إن جاله أوردر جديد كاش ومحتاج يدخل يوافق عليه
+                \App\Models\notification::create([
+                    'user_id' => $vendor->user_id,
+                    'message' => "You have received a new order #{$order->id}! Please review and accept it.",
+                    'type' => 'order',
+                ]);
 
                 return response()->json([
                     'message' => 'Order created successfully (Cash)',
