@@ -28,7 +28,7 @@ class vendor extends Model
     protected function logo(): Attribute
     {
         return Attribute::make(
-            get: fn($value) => str_starts_with($value, 'http') ? $value : asset('storage/' . $value),
+            get: fn($value) => str_starts_with($value, 'http') ? $value : asset($value),
         );
     }
     public function user()
