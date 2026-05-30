@@ -41,9 +41,9 @@ class SustainabilityController extends Controller
                 $q->where('order_status', 'completed');
             })
                 ->join('orders', 'order_items.order_id', '=', 'orders.id')
-                ->selectRaw('MONTHNAME(orders.order_date) as month, SUM(order_items.quantity) as meals')
-                ->groupBy('month')
-                ->orderBy(DB::raw('MONTH(orders.order_date)'))
+                ->selectRaw('MONTHNAME(orders.order_date) as month, MONTH(orders.order_date) as month_num, SUM(order_items.quantity) as meals')
+                ->groupBy('month','month_num')
+                ->orderBy('month_num', 'asc')
                 ->get()
                 ->map(function ($item) {
                     return [
