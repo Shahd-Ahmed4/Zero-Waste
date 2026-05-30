@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\SustainabilityController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BranchController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\OrderItemController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\VendorController;
+use App\Http\Controllers\VendorDashboardController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -49,16 +51,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/vendor/orders', [VendorController::class, 'getOrdersForMe']);
         Route::patch('/vendor/orders/{id}/status', [OrderController::class, 'updateStatus']);
         // عرض قائمة المبيعات (Order Items)
-        Route::get('/sales', [OrderItemController::class, 'vendorSales']);
 
-        // عرض تفاصيل "قطعة" مبيوعة معينة
-        Route::get('/sales/{id}', [OrderItemController::class, 'showSoldItem']);
+        Route::get('/vendor/dashboard/overview', [VendorDashboardController::class, 'getOverviewStats']);
+        Route::get('/vendor/dashboard/monthly-chart', [VendorDashboardController::class, 'getMonthlySalesChart']);
 
-        // تقرير الأرباح والإحصائيات
-        Route::get('/sales-report', [OrderItemController::class, 'salesReport']);
-
-        // أكثر 5 منتجات مبيعاً
-        Route::get('/top-selling', [OrderItemController::class, 'topSelling']);
+        // [2] الدوال الأربعة اللي اتنقلت ومسارها الجديد بقا كالتالي:
+        Route::get('/vendor/dashboard/top-selling', [VendorDashboardController::class, 'topSelling']);
+        Route::get('/vendor/dashboard/sales', [VendorDashboardController::class, 'vendorSales']);
+        Route::get('/vendor/dashboard/sales/{id}', [VendorDashboardController::class, 'showSoldItem']);
         Route::get('/vendor/reviews', [VendorController::class, 'offerReviews']);
         Route::get('/vendor/offers/{offer_id}/reviews', [VendorController::class, 'showOfferReviews']);
         Route::get('/my-branches', [BranchController::class, 'index']);      // عرض كل فروعي
@@ -76,8 +76,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
 Route::middleware(['auth:sanctum', 'checkadmin'])->group(function () {
-    Route::get('/dashboard/stats', [DashboardController::class, 'getStats']);
-    Route::get('/dashboard/activity', [DashboardController::class, 'getRecentActivity']);
+    Route::get('/dashboard/stats', [AdminDashboardController::class, 'getOverviewStats']);
+    Route::get('/dashboard/earnings', [AdminDashboardController::class, 'getMonthlyEarningsChart']);
+    Route::get('/dashboard/activity', [AdminDashboardController::class, 'getRecentActivity']);
     Route::get('/admin/customers', [AdminController::class, 'index']);
     Route::get('/admin/customers/{id}', [AdminController::class, 'show']);
     Route::get('/admin/all-orders', [AdminController::class, 'listAllOrders']);
