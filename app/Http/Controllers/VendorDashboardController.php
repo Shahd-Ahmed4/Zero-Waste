@@ -25,7 +25,7 @@ class VendorDashboardController extends Controller
         $vendorId = $this->getVendorId();
 
         // حساب إجمالي المبيعات الإجمالية للأوردرات الـ Completed الخاصة بهذا التاجر فقط
-        $report = order_item::whereHas('offer', function ($query) use ($vendorId) {
+        $report = order_item::whereHas('offer.branch', function ($query) use ($vendorId) {
             $query->where('vendor_id', $vendorId);
         })
             ->whereHas('order', function ($query) {
@@ -45,7 +45,9 @@ class VendorDashboardController extends Controller
         $netVendorRevenue = $grossRevenue - $platformCommission;
 
         // حساب عدد العروض النشطة حالياً للمحل ده بس
-        $activeOffersCount = offer::where('vendor_id', $vendorId)
+        $activeOffersCount = offer::whereHas('branch', function ($query) use ($vendorId) {
+            $query->where('vendor_id', $vendorId);
+        })
             ->where('status', 'active')
             ->count();
 
@@ -72,7 +74,7 @@ class VendorDashboardController extends Controller
     {
         $vendorId = $this->getVendorId();
 
-        $monthlyData = order_item::whereHas('offer', function ($query) use ($vendorId) {
+        $monthlyData = order_item::whereHas('offer.branch', function ($query) use ($vendorId) {
             $query->where('vendor_id', $vendorId);
         })
             ->whereHas('order', function ($query) {
@@ -108,7 +110,7 @@ class VendorDashboardController extends Controller
     {
         $vendorId = $this->getVendorId();
 
-        $topOffers = order_item::whereHas('offer', function ($query) use ($vendorId) {
+        $topOffers = order_item::whereHas('offer.branch', function ($query) use ($vendorId) {
             $query->where('vendor_id', $vendorId);
         })
             ->select('offer_id', DB::raw('SUM(quantity) as total_sold'))
@@ -131,12 +133,12 @@ class VendorDashboardController extends Controller
     {
         $vendorId = $this->getVendorId(); // بجيب الـ vendor_id الصح بتاع التاجر اللي عامل login
 
-        $sales = order_item::whereHas('offer', function ($query) use ($vendorId) {
+        $sales = order_item::whereHas('offer.branch', function ($query) use ($vendorId) {
             $query->where('vendor_id', $vendorId);
         })
             ->with([
                 // بنستخدم withTrashed عشان لو العرض اتمسح (Soft Delete) يفضل ظاهر في السجل
-                'offer' => fn($q) => $q->withTrashed()->select('id', 'title', 'thumbnail'),
+                'offer' => fn($q) => $q->withTrashed()->select('id', 'title', 'image'),
                 'order:id,order_status,order_date'
             ])
             ->latest()
@@ -156,7 +158,7 @@ class VendorDashboardController extends Controller
     {
         $vendorId = $this->getVendorId(); // بجيب الـ vendor_id الصح بتاع التاجر اللي عامل login
 
-        $item = order_item::whereHas('offer', function ($query) use ($vendorId) {
+        $item = order_item::whereHas('offer.branch', function ($query) use ($vendorId) {
             $query->where('vendor_id', $vendorId);
         })
             ->with([
@@ -170,5 +172,4 @@ class VendorDashboardController extends Controller
             'data' => $item
         ]);
     }
-
 }
