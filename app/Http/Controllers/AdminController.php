@@ -395,9 +395,17 @@ class AdminController extends Controller
     }
     public function listAllOrders()
     {
-        // عرض كل الطلبات في السيستم مع بيانات العميل
-        $orders = order::with('customer')->latest()->paginate(10);
-        return response()->json(['success' => true, 'data' => $orders]);
+        $orders = order::with('customer.user')->latest()->paginate(10);
+
+        // بنلف على الـ orders ونرفع اسم اليوزر برة عشان الـ Frontend يلقطه فوراً
+        $orders->through(function ($order) {
+            // بنشيك الأول إن الأوردر ليه عميل، والعميل ليه يوزر، عشان الكود ما يضربش لو فيه داتا ناقصة
+            $order->customer_name = ($order->customer && $order->customer->user)
+                ? $order->customer->user->name
+                : 'N/A';
+
+            return $order;
+        });
     }
     public function toggleVisibility($id)
     {
