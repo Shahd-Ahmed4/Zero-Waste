@@ -136,7 +136,7 @@ class OrderController extends Controller
 
                 return response()->json([
                     'message' => 'Order created successfully (Cash)',
-                    'order' => $order->load('items')
+                    'order' => $order->refresh()->load('items')
                 ], 201);
             });
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -273,10 +273,20 @@ class OrderController extends Controller
      */
     public function show($id)
     {
-        $order = order::where('customer_id', auth()->id())
-            ->with(['items.offer:id,title,price,image'])
+        $customer = \App\Models\customer::where('user_id', auth()->id())->first();
+
+        if (!$customer) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Customer profile not found.'
+            ], 404);
+        }
+        // 2. بنجيب الأوردر بناءً على الـ customer_id الصح بتاعه
+        $order = \App\Models\order::where('customer_id', $customer->id)
+            ->with(['items.offer:id,title,original_price,discount_price,image']) // ضيفنا الأسعار عشان الفرونت يعرض الحسبة صح
             ->findOrFail($id);
 
+        // لارافيل أوتوماتيك هيبعت الـ commission_fee والـ delivery_fees جوه الـ order
         return response()->json([
             'success' => true,
             'data' => $order
