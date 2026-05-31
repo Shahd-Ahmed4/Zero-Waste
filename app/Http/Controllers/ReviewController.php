@@ -33,7 +33,7 @@ class ReviewController extends Controller
 
         // 2. Verification: Did this Customer purchase this specific Offer and is the Order completed?
         $hasBought = order::where('customer_id', $customerId)
-            ->where('status', 'completed')
+            ->where('order_status', 'completed')
             ->whereHas('items', function ($query) use ($offerId) {
                 $query->where('offer_id', $offerId);
             })
