@@ -156,20 +156,28 @@ class VendorDashboardController extends Controller
      */
     public function showSoldItem($id)
     {
-        $vendorId = $this->getVendorId(); // بجيب الـ vendor_id الصح بتاع التاجر اللي عامل login
+        try {
+            $vendorId = $this->getVendorId(); // بجيب الـ vendor_id الصح بتاع التاجر اللي عامل login
 
-        $item = order_item::whereHas('offer.branch', function ($query) use ($vendorId) {
-            $query->where('vendor_id', $vendorId);
-        })
-            ->with([
-                'offer' => fn($q) => $q->withTrashed(),
-                'order.customer:id,name,email' // بيانات العميل اللي اشترى
-            ])
-            ->findOrFail($id);
+            $item = order_item::whereHas('offer.branch', function ($query) use ($vendorId) {
+                $query->where('vendor_id', $vendorId);
+            })
+                ->with([
+                    'offer' => fn($q) => $q->withTrashed(),
+                    'order.customer.user:id,name,email' // بيانات العميل اللي اشترى
+                ])
+                ->findOrFail($id);
 
-        return response()->json([
-            'success' => true,
-            'data' => $item
-        ]);
+            return response()->json([
+                'success' => true,
+                'data' => $item
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Something went wrong!',
+                'error_debug' => $e->getMessage()
+            ], 500);
+        }
     }
 }
