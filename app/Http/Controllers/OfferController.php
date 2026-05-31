@@ -267,8 +267,6 @@ class OfferController extends Controller
                 $data['expiration_time'] = date('Y-m-d H:i:s', strtotime($data['expiration_time']));
             }
 
-            $offer = $branch->offers()->create($data);
-
             // 4. إنشاء العرض تحت الفرع
             $offer = $branch->offers()->create($data);
 

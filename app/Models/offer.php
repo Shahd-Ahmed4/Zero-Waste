@@ -35,14 +35,19 @@ class offer extends Model
 
     protected static function booted()
     {
-        static::addGlobalScope('activeOffers', function ($builder) {
-            $builder->where('quantity_available', '>', 0)
+        static::addGlobalScope('activeOffersForCustomers', function ($builder) {
+            // 🟢 السحر هنا: لو احنا في الـ Local Console أو اللي عامل Login تاجر أو أدمن، الـ Scope مش هيتدخل وهيقف ل تماماً
+            if (app()->runningInConsole() || (auth()->check() && (auth()->user()->vendor || auth()->user()->role === 'admin'))) {
+                return;
+            }
+
+            // 🎯 الشروط دي هتتطبق بس على الزبائن والزوار (Real-time Filtering):
+            $builder->where('offers.status', 'active')
+                ->where('offers.quantity_available', '>', 0)
                 ->where(function ($query) {
-                    $query->whereNull('expiration_time')
-                        ->orWhere('expiration_time', '>', now());
-                })
-                ->where('status', '!=', 'disabled')
-                ->where('status', '!=', 'expired');
+                    $query->whereNull('offers.expiration_time')
+                        ->orWhere('offers.expiration_time', '>', now());
+                });
         });
     }
 
