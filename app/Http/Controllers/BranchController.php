@@ -193,4 +193,21 @@ class BranchController extends Controller
             'data' => $branches
         ]);
     }
+    public function getBranchDetails($id)
+    {
+        // بنجيب الفرع مع العروض بتاعته بس (الـ Global Scope هيجيب الـ active والـ quantity > 0 تلقائياً للعميل)
+        $branch = branch::with(['offers', 'vendor:id,business_name,logo'])->find($id);
+
+        if (!$branch) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Branch not found!'
+            ], 404);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $branch
+        ], 200);
+    }
 }

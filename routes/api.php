@@ -148,3 +148,4 @@ Route::get('/vendor/{id}', [VendorController::class, 'show']); //ygeb vendor mo3
 Route::get('/offers', [OfferController::class, 'index']);
 Route::get('/offers/{id}', [OfferController::class, 'show']);
 Route::get('/offers/{offer_id}/reviews', [ReviewController::class, 'index']);
+Route::get('/branches/{id}/details', [BranchController::class, 'getBranchDetails']);
