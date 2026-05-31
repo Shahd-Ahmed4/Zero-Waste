@@ -27,7 +27,7 @@ class offer extends Model
     ];
     protected $hidden = ['created_at', 'updated_at'];
     // السطر ده بيخلي الـ Average Rating يظهر في الـ API أوتوماتيك
-    protected $appends = ['average_rating', 'image_url'];
+    protected $appends = ['average_rating', 'image_url', 'status'];
 
     protected $casts = [
         'expiration_time' => 'datetime',
@@ -35,16 +35,14 @@ class offer extends Model
 
     protected static function booted()
     {
-        static::saving(function ($offer) {
-            // لو الكمية خلصت أو بقت صفر، اقلب الحالة تلقائياً لـ disabled
-            if ($offer->quantity_available <= 0) {
-                $offer->status = 'disabled';
-            }
-
-            // حماية إضافية: لو الوقت عدى اقلبها expired
-            if ($offer->expiration_time && $offer->expiration_time->isPast()) {
-                $offer->status = 'expired';
-            }
+        static::addGlobalScope('activeOffers', function ($builder) {
+            $builder->where('quantity_available', '>', 0)
+                ->where(function ($query) {
+                    $query->whereNull('expiration_time')
+                        ->orWhere('expiration_time', '>', now());
+                })
+                ->where('status', '!=', 'disabled')
+                ->where('status', '!=', 'expired');
         });
     }
 
@@ -109,5 +107,17 @@ class offer extends Model
 
         // صورة افتراضية لو مفيش صورة للعرض
         return asset('images/default-placeholder.png');
+    }
+    public function getStatusAttribute()
+    {
+        if ($this->quantity_available <= 0) {
+            return 'disabled';
+        }
+
+        if ($this->expiration_time && $this->expiration_time->isPast()) {
+            return 'expired';
+        }
+
+        return $this->attributes['status'] ?? 'active';
     }
 }
