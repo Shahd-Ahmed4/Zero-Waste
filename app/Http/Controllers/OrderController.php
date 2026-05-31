@@ -37,6 +37,7 @@ class OrderController extends Controller
                 'delivery_type' => 'required|in:pickup,delivery',
                 'customer_lat' => 'required_if:delivery_type,delivery',
                 'customer_long' => 'required_if:delivery_type,delivery',
+                'payment_method_id' => 'required_if:payment_method,card',
             ]);
 
             // استخدام الـ Transaction عشان لو حصلت مشكلة في النص، مفيش داتا تضرب
@@ -104,29 +105,78 @@ class OrderController extends Controller
                     'total_amount' => $finalTotalAmount
                 ]);
 
-                // 7. التعامل مع الدفع
+                // 🎯 7. التعامل مع الدفع (التعديل الجوهري هنا)
                 if ($request->payment_method === 'card') {
-                    $paymentUrl = $this->paymentService->createCheckoutSession($order);
-                    \App\Models\payment::create([
-                        'order_id' => $order->id,
-                        'transaction_id' => $this->paymentService->getLastSessionId(), // الـ ID اللي جاي من Stripe
-                        'amount' => $order->total_amount,
-                        'payment_status' => 'pending',
-                        'payment_method' => 'card'
-                    ]);
-                    \App\Models\notification::create([
-                        'user_id' => $customer->user_id,
-                        'message' => "Order #{$order->id} created! Please complete your card payment via the link.",
-                        'type' => 'order',
-                    ]);
-                    return response()->json(['payment_url' => $paymentUrl], 201);
+                    try {
+                        // بننادي على Stripe عشان يعمل الـ السحب الفوري (PaymentIntent)
+                        // ملحوظة: تأكدي من عمل الـ use لـ \Stripe\Stripe فوق أو سيبيها كدة
+                        \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+
+                        $charge = \Stripe\PaymentIntent::create([
+                            'amount' => (int) ($order->total_amount * 100), // بالقروش
+                            'currency' => 'egp',
+                            'payment_method' => $request->payment_method_id,
+                            'confirm' => true, // سحب لايف في نفس الثانية
+                            'automatic_payment_methods' => [
+                                'enabled' => true,
+                                'allow_redirects' => 'never' // عشان يفضل العميل جوه شاشة الأبلكيشن
+                            ],
+                            'metadata' => [
+                                'order_id' => $order->id,
+                                'customer_id' => $customer->id,
+                            ]
+                        ]);
+
+                        // ✅ لو الدفع تم بنجاح والفلوس اتسحبت فعلياً
+                        if ($charge->status === 'succeeded') {
+                            \App\Models\payment::create([
+                                'order_id' => $order->id,
+                                'transaction_id' => $charge->id, // الـ ID الحقيقي للعملية من Stripe
+                                'amount' => $order->total_amount,
+                                'payment_status' => 'completed',
+                                'payment_method' => 'card'
+                            ]);
+
+                            // الأوردر مدفوع وجاهز.. يتحول فوراً لـ "قيد التحضير"
+                            $order->update(['order_status' => 'processing']);
+
+                            // إرسال الإشعارات الفورية
+                            \App\Models\notification::create([
+                                'user_id' => $customer->user_id,
+                                'message' => "Payment successful! Order #{$order->id} is being prepared.",
+                                'type' => 'order',
+                            ]);
+
+                            \App\Models\notification::create([
+                                'user_id' => $vendor->user_id,
+                                'message' => "New paid order #{$order->id}! Please prepare it.",
+                                'type' => 'order',
+                            ]);
+
+                            return response()->json([
+                                'success' => true,
+                                'message' => 'Order created and payment successful!',
+                                'order' => $order->refresh()->load('items')
+                            ], 201);
+                        } else {
+                            // لو الـ status رجع أي حاجة مش نجاح (رمي Exception عشان الـ Transaction تقلب)
+                            throw new \Exception('Stripe payment status: ' . $charge->status);
+                        }
+
+                    } catch (\Exception $e) {
+                        // 🟢 هنا حماية الداتابيز: لو كارت العميل اترفض، الـ Exception ده هيطير 
+                        // والـ DB::transaction هتعمل أوتوماتيكياً Rollback وتمسح الأوردر وترجع الـ Stock
+                        throw new \Exception('Payment process failed: ' . $e->getMessage());
+                    }
                 }
+
                 // 🔔 إشعار للعميل في حالة الـ Cash إن الأوردر نجح ومستني التاجر
                 \App\Models\notification::create([
                     'user_id' => $customer->user_id,
                     'message' => "Your order #{$order->id} has been placed successfully and is waiting for vendor approval.",
                     'type' => 'order',
                 ]);
+
                 // 🔔 إشعار للفيندور (التاجر) إن جاله أوردر جديد كاش ومحتاج يدخل يوافق عليه
                 \App\Models\notification::create([
                     'user_id' => $vendor->user_id,
@@ -135,10 +185,12 @@ class OrderController extends Controller
                 ]);
 
                 return response()->json([
+                    'success' => true,
                     'message' => 'Order created successfully (Cash)',
                     'order' => $order->refresh()->load('items')
                 ], 201);
             });
+
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'status' => 'error',
@@ -147,7 +199,7 @@ class OrderController extends Controller
             ], 422);
 
         } catch (\Exception $e) {
-            // 🟢 هنا السر! الـ 500 هتتحول لرسالة مقروءة هتقولهم بالملي إيه اللي ضرب جوه الكود
+            // الـ 500 المقروءة والجميلة اللي بتشرح السبب لو الفيزا اترفضت أو الكود ضرب
             return response()->json([
                 'status' => 'error',
                 'message' => 'Something went wrong while placing the order!',
