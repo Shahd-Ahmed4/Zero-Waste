@@ -21,12 +21,12 @@ class ReviewController extends Controller
             ]);
 
             // Get the Customer profile associated with the currently logged-in User
-            $customer = Auth::user()->customer;
+            $customer = \App\Models\customer::where('user_id', auth()->id())->first();
 
             if (!$customer) {
                 return response()->json([
-                    'message' => 'Unauthorized. You must be registered as a customer to post a review.'
-                ], 403);
+                    'message' => 'This user does not have a customer account.'
+                ], 404);
             }
 
             $customerId = $customer->id;
