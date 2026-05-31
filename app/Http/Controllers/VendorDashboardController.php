@@ -164,7 +164,7 @@ class VendorDashboardController extends Controller
             })
                 ->with([
                     'offer' => fn($q) => $q->withTrashed(),
-                    'order.customer.user:id,name,email' // بيانات العميل اللي اشترى
+                    'order.customer.user:id,name,email,phone' // بيانات العميل اللي اشترى
                 ])
                 ->findOrFail($id);
 
