@@ -119,13 +119,23 @@ class ReviewController extends Controller
     // Display reviews for a specific offer
     public function index($offer_id)
     {
-        $reviews = review::with('customer.user:id,name') // Eager load customer name for display
+        $reviews = review::with('customer.user:id,name')
             ->where('offer_id', $offer_id)
+            ->where('is_visible', true)
             ->latest()
             ->get();
 
+        // 🟢 خطوة إضافية: عشان نضمن إن روابط الصور ترجع كاملة بـ الـ URL بتاع السيرفر للفرونت إند
+        $reviews->transform(function ($review) {
+            if ($review->image) {
+                $review->image = asset($review->image);
+            }
+            return $review;
+        });
+
         return response()->json($reviews);
     }
+
     /**
      * Remove the specified review from storage.
      */
