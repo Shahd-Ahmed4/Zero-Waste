@@ -8,6 +8,7 @@ use App\Models\branch;
 use App\Models\offer;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 class OfferSeeder extends Seeder
 {
     public function run()
@@ -155,7 +156,7 @@ class OfferSeeder extends Seeder
                 $businessName = strtolower($branch->vendor->business_name);
                 $originalName = $branch->vendor->business_name;
 
-                if ($vendorType === 'restaurants') {
+                if ($vendorType === 'restaurant') {
                     $vendorType = 'restaurant';
                 }
                 if ($vendorType === 'bakeries') {
@@ -236,9 +237,15 @@ class OfferSeeder extends Seeder
                     // تحويل اسم البراند لشكل متناسق مع أسماء الملفات (مثال: burger king -> burger-king)
                     $imageName = Str::slug($brandKey) . $imageNumber . '.jpg';
 
-                    $dynamicImageUrl = file_exists(public_path('uploads/' . $imageName))
-                        ? asset('uploads/' . $imageName)
-                        : asset('uploads/generic-restaurant1.jpg');
+                    $localImagePath = public_path('uploads/' . $imageName);
+
+                    if (file_exists($localImagePath)) {
+                        $dynamicImageUrl = Cloudinary::upload($localImagePath)->getSecurePath();
+                    } else {
+                        $dynamicImageUrl = Cloudinary::upload(
+                            public_path('uploads/generic-restaurant1.jpg')
+                        )->getSecurePath();
+                    }
 
                     $originalPrice = rand(120, 500);
                     $discountPercentage = rand(15, 50) / 100;
