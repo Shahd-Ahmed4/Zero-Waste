@@ -58,7 +58,7 @@ class OrderController extends Controller
                         $branch->long
                     );
                     // الحد الأدنى للتوصيل 15 جنيه، وكل كيلو بـ 5 جنيه
-                    $deliveryFees = max(15, round($distanceKm * 5, 2));
+                   $deliveryFees = min(50, max(15, round($distanceKm * 3, 2)));
                 }
 
                 // 4. إنشاء الأوردر الأساسي
@@ -301,7 +301,7 @@ class OrderController extends Controller
             $branch->lat,
             $branch->long
         );
-        $deliveryFee = max(15, round($distanceKm * 5, 2));
+        $deliveryFee = min(50, max(15, round($distanceKm * 3, 2)));
 
         return response()->json([
             'delivery_fee' => $deliveryFee,
