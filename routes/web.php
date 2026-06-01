@@ -21,3 +21,7 @@ Route::post('/upload-seed-images', function (Illuminate\Http\Request $request) {
     }
     return 'Done! ' . $count . ' images uploaded.';
 });
+Route::get('/list-uploads', function () {
+    $files = glob(public_path('uploads') . '/*');
+    return implode('<br>', array_map('basename', $files));
+});
