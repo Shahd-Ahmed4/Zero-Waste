@@ -2,14 +2,22 @@
 
 use Illuminate\Support\Facades\Route;
 
-Route::get('/upload-seed-images', function () {
-    $source = base_path('public/uploads');
-    $files = glob($source . '/*.jpg');
+Route::get('/upload-form', function () {
+    return '
+    <form method="POST" action="/upload-seed-images" enctype="multipart/form-data">
+        ' . csrf_field() . '
+        <input type="file" name="images[]" multiple accept="image/*">
+        <button type="submit">Upload</button>
+    </form>';
+});
 
-    foreach ($files as $file) {
-        $filename = basename($file);
-        copy($file, public_path('uploads/' . $filename));
+Route::post('/upload-seed-images', function (Illuminate\Http\Request $request) {
+    $count = 0;
+    if ($request->hasFile('images')) {
+        foreach ($request->file('images') as $file) {
+            $file->move(public_path('uploads'), $file->getClientOriginalName());
+            $count++;
+        }
     }
-
-    return 'Done! ' . count($files) . ' images copied.';
+    return 'Done! ' . $count . ' images uploaded.';
 });
