@@ -25,3 +25,12 @@ Route::get('/list-uploads', function () {
     $files = glob(public_path('uploads') . '/*');
     return implode('<br>', array_map('basename', $files));
 });
+Route::get('/delete-uploads', function () {
+    $files = glob(public_path('uploads') . '/*');
+    foreach ($files as $file) {
+        if (is_file($file)) {
+            unlink($file);
+        }
+    }
+    return 'Done! All files deleted.';
+});
