@@ -8,7 +8,6 @@ use App\Models\branch;
 use App\Models\offer;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
-use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 class OfferSeeder extends Seeder
 {
     public function run()
@@ -239,13 +238,9 @@ class OfferSeeder extends Seeder
 
                     $localImagePath = public_path('uploads/' . $imageName);
 
-                    if (file_exists($localImagePath)) {
-                        $dynamicImageUrl = Cloudinary::upload($localImagePath)->getSecurePath();
-                    } else {
-                        $dynamicImageUrl = Cloudinary::upload(
-                            public_path('uploads/generic-restaurant1.jpg')
-                        )->getSecurePath();
-                    }
+                    $dynamicImageUrl = file_exists($localImagePath)
+                        ? 'uploads/' . $imageName
+                        : 'uploads/' . Str::slug($brandKey) . '1.jpg';
 
                     $originalPrice = rand(120, 500);
                     $discountPercentage = rand(15, 50) / 100;

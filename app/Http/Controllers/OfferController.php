@@ -259,11 +259,10 @@ class OfferController extends Controller
             // 3. رفع الصورة
             // 3. رفع الصورة إلى Cloudinary
             if ($request->hasFile('image')) {
-                // رفع الصورة لـ Cloudinary والحصول على الرابط الآمن
-                $uploadedFileUrl = Cloudinary::upload($request->file('image')->getRealPath())->getSecurePath();
-
-                // سحب الرابط عشان يتسيف في الداتابيز
-                $data['image'] = $uploadedFileUrl;
+                $file = $request->file('image');
+                $imageName = time() . '_' . $file->getClientOriginalName();
+                $file->move(public_path('uploads'), $imageName);
+                $data['image'] = 'uploads/' . $imageName;
             }
             // Add this right before: $offer = $branch->offers()->create($data);
             if (isset($data['expiration_time'])) {
