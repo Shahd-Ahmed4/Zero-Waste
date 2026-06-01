@@ -258,9 +258,11 @@ class OfferController extends Controller
             // 3. رفع الصورة
             if ($request->hasFile('image')) {
                 $file = $request->file('image');
-                $filename = time() . '_' . $file->getClientOriginalName();
-                $file->move(public_path('uploads/offers'), $filename);
-                $data['image'] = 'uploads/offers/' . $filename;
+                // هتحفظ الصورة أوتوماتيك جوه storage/app/public/uploads/offers
+                $path = $file->store('uploads/offers', 'public');
+
+                // سحب المسار عشان يتسيف في الداتابيز
+                $data['image'] = $path;
             }
             // Add this right before: $offer = $branch->offers()->create($data);
             if (isset($data['expiration_time'])) {
@@ -283,7 +285,13 @@ class OfferController extends Controller
 
             // تحضير رابط الصورة النهائي في الـ Response
             if ($offer->image) {
-                $offer->image = asset($offer->image);
+                // لو الصورة جاية من الـ Vendor هتبدأ بـ uploads/offers، فبنقراها من الـ storage
+                if (str_contains($offer->image, 'offers/')) {
+                    $offer->image = asset('storage/' . $offer->image);
+                } else {
+                    // لو الصورة جاية من الـ Seeder هتبقى uploads/el-abd1.jpg فبنقراها مباشر
+                    $offer->image = asset($offer->image);
+                }
             }
 
             return response()->json([
@@ -359,19 +367,27 @@ class OfferController extends Controller
         }
         if ($request->hasFile('image')) {
             $file = $request->file('image');
-            $filename = time() . '_' . $file->getClientOriginalName();
-            $destinationPath = public_path('uploads/offers');
-            if (!file_exists($destinationPath)) {
-                mkdir($destinationPath, 0755, true);
-            }
+            // حفظ الصورة أوتوماتيك جوه storage/app/public/uploads/offers
+            $path = $file->store('uploads/offers', 'public');
 
-            $file->move($destinationPath, $filename);
-            $data['image'] = 'uploads/offers/' . $filename;
+            // حفظ المسار الجديد في الداتابيز
+            $data['image'] = $path;
         }
+
         if (isset($data['expiration_time'])) {
             $data['expiration_time'] = date('Y-m-d H:i:s', strtotime($data['expiration_time']));
         }
         $offer->update($data);
+
+        if ($offer->image) {
+            // لو الصورة جاية من الـ Vendor (فيها offers/) بنقراها من الـ storage
+            if (str_contains($offer->image, 'offers/')) {
+                $offer->image = asset('storage/' . $offer->image);
+            } else {
+                // لو الصورة جاية من الـ Seeder الأساسي بنقراها مباشر
+                $offer->image = asset($offer->image);
+            }
+        }
         return response()->json(['status' => 'success', 'offer' => $offer]);
     }
 

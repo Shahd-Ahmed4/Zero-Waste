@@ -1,130 +1,267 @@
 <?php
 
+
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\branch;
 use App\Models\offer;
 use Carbon\Carbon;
+use Illuminate\Support\Str;
 
 class OfferSeeder extends Seeder
 {
     public function run()
     {
-        // بنجيب كل الفروع ومعاها بيانات الـ Vendor عشان نعرف نوع النشاط
         $branches = branch::with('vendor')->get();
 
-        // لو مفيش فروع في الداتا بيز بنوقف السيدر عشان ميحصلش إيرور
         if ($branches->isEmpty()) {
             return;
         }
 
-        // قوالب بيانات منوعة جداً (7 أصناف لكل نوع) عشان يظهر اختلاف كبير في الأصناف
-        // ✨ كومنت مضاف: تم تعديل النصوص الإنجليزي هنا لتعبّر عن أكل فائض حقيقي وصلاحية أسرع لمنع الهدر
-        $content = [
-            'restaurant' => [
-                ['title' => 'Surplus Grilled Chicken Meal', 'description' => 'Remaining fresh grilled chicken from lunch shift, served with rice. Must be consumed tonight.'],
-                ['title' => 'End of Day Shawarma Wraps', 'description' => 'Last 3 prepared chicken shawarma wraps from the afternoon batch, perfectly wrapped and warm.'],
-                ['title' => 'Prepared Mix Appetizers Platter', 'description' => 'Freshly made sambousek and kibbeh platter left over from a catering order, ready to eat.'],
-                ['title' => 'Crispy Chicken Strips Box', 'description' => 'A box of fried chicken pieces and fries cooked 2 hours ago. Still crunchy and delicious.'],
-                ['title' => 'Over-prepared Beef Burgers', 'description' => 'Extra double beef burgers prepared for dinner rush. High quality and ready for quick pickup.'],
-                ['title' => 'Daily Baked Pasta Pan', 'description' => 'A full tray portion of baked lasagna bolognese, kept fresh in the oven. Final clearance before closing.'],
-                ['title' => 'Mixed Oriental Rice Bowl', 'description' => 'Fresh basmati rice bowl topped with kofta pieces from today’s lunch shift.'],
+        // تفكيك الأكلات بدقة شديدة بناءً على براند المحل نفسه
+        $specificContent = [
+            // --- المطاعم (Restaurants) ---
+            'kfc' => [
+                ['title' => 'Crispy Chicken Strips Box', 'description' => 'A box of fried chicken pieces and family-size fries cooked during afternoon shift.'],
+                ['title' => 'Surplus Grilled Chicken Meal', 'description' => 'Remaining fresh grilled chicken from lunch shift, served with rice and garlic dip.'],
+                ['title' => 'Mighty Zinger Meal Clearance', 'description' => 'Extra spicy chicken zinger sandwiches left from the dinner rush bundle.'],
             ],
-            'cafe' => [
-                ['title' => 'Morning Croissant Clearance', 'description' => 'Butter and cheese croissants baked fresh this morning. Perfect evening snack before they harden.'],
-                ['title' => 'Assorted Donuts Box (Save Food)', 'description' => '6 pieces of delicious glazed donuts remaining from today’s display window.'],
-                ['title' => 'Fresh Cold Club Sandwiches', 'description' => 'Turkey and cheddar cold club sandwiches made today. Safe to consume within 6 hours.'],
-                ['title' => 'Remaining Chocolate Brownies', 'description' => '3 pieces of rich chocolate brownie squares left from the daily cafe display.'],
-                ['title' => 'Carrot Cake Slices Promo', 'description' => 'Last two fresh slices of premium carrot cake with cream frosting. Must sell tonight.'],
-                ['title' => 'Fresh Blueberry Muffin Pack', 'description' => 'A bakery box containing 4 fluffy muffins baked in the morning shift.'],
-                ['title' => 'Cookies & Danish Bag', 'description' => 'A mix of chocolate chip cookies and fruit danish pastries left over from the afternoon.'],
+            'mcdonalds' => [
+                ['title' => 'Over-prepared Double Beef Burger', 'description' => 'Extra double beef burgers prepared for dinner rush. High quality and ready for quick pickup.'],
+                ['title' => 'Crispy Chicken Sandwich Promo', 'description' => 'Crispy chicken sandwich with lettuce and mayo sauce, ready for instant takeaway.'],
+                ['title' => 'Big Mac Cheese Burger Box', 'description' => 'Surplus of the famous big mac beef burgers kept fresh before closing.'],
             ],
-            'supermarket' => [
-                ['title' => 'Ripe Seasonal Fruit Basket', 'description' => 'A mix of fully ripe apples, bananas, and grapes. Perfect for immediate eating or making juice.'],
-                ['title' => 'Daily Dairy & Yogurt Bundle', 'description' => 'Premium milk bottles and fresh yogurt cups with expiry dates within the next 48 hours.'],
-                ['title' => 'Sliced Cold Cuts Platter', 'description' => 'Smoked turkey and roast beef slices packed today. Needs to be kept refrigerated and consumed soon.'],
-                ['title' => 'Grocery Essential Short-Date Pack', 'description' => 'Bundle of premium tomato sauce and cooking oil approaching their display deadline.'],
-                ['title' => 'Healthy Granola & Nut Bars', 'description' => 'A collection of organic protein and fruit bars with a close expiry date.'],
-                ['title' => 'Fresh Vegetable Mix Box', 'description' => '3kg of fresh organic tomatoes, cucumbers, and bell peppers that need to be used tonight.'],
+            'burger king' => [
+                ['title' => 'Whopper Beef Burger Surplus', 'description' => 'Extra flame-grilled Whopper burgers prepared for evening rush.'],
+                ['title' => 'Chicken Royale Meal Deal', 'description' => 'Remaining chicken royale sandwiches cooked during afternoon shift.'],
             ],
-            'bakery' => [ // ✨ كومنت مضاف: قوالب المخابز الجديدة المتناسقة مع الويب
-                ['title' => 'Evening Baguette Discount', 'description' => '3 pieces of traditional French baguettes baked this afternoon. Best enjoyed tonight.'],
-                ['title' => 'Sliced Fudge Cake Clearance', 'description' => 'Last remaining slices of today’s premium chocolate fudge cake.'],
-                ['title' => 'Mixed Patisserie Sweet Box', 'description' => 'An assortment of mini gateaux and eastern sweets left from the morning bakery production.'],
-                ['title' => 'Soft Dinner Rolls Pack', 'description' => 'A package of 12 soft milk buns and rolls baked early today, perfect for dinner.'],
+            'pizza hut' => [
+                ['title' => 'Daily Baked Pasta Pan Portion', 'description' => 'A full tray portion of baked lasagna bolognese, kept fresh in the oven before closing.'],
+                ['title' => 'Super Supreme Pizza Slices Bag', 'description' => 'Large pizza slices leftover from canceled catering order, perfectly safe.'],
             ],
-            'hotel' => [ // ✨ كومنت مضاف: قوالب الفنادق الجديدة الفخمة
-                ['title' => 'Lunch Buffet Surplus Ticket', 'description' => 'Access voucher for the premium 5-star open buffet dinner, clearing out the fresh kitchen creations.'],
-                ['title' => 'Late Afternoon High Tea Box', 'description' => 'Luxury afternoon tea sweets, scones, and savory finger sandwiches packed fresh after service.'],
-                ['title' => 'Fresh Live-Station Sushi Platter', 'description' => '12 pieces of assorted sushi rolls prepared during the midday buffet by our head chef.'],
-                ['title' => 'Premium International Pastry Pack', 'description' => 'A luxury box containing French tarts and desserts from the hotel’s morning bakery lounge.'],
+            'dominos' => [
+                ['title' => 'Pepperoni Pizza Clearance Portion', 'description' => 'Freshly baked pepperoni pizza slices from afternoon batch.'],
+                ['title' => 'Cheesy Garlic Bread Basket', 'description' => 'Freshly prepared garlic bread with melted mozzarella cheese leftover.'],
+            ],
+            'hardees' => [
+                ['title' => 'Super Star Beef Burger Option', 'description' => 'Extra premium beef burgers prepared during dinner shift.'],
+            ],
+            'shawarma' => [
+                ['title' => 'End of Day Chicken Shawarma Wrap', 'description' => 'Delicious prepared chicken shawarma wrap from afternoon batch, perfectly wrapped.'],
+                ['title' => 'Beef Shawarma Fattah Platter', 'description' => 'Fresh fatteh tray with meat shawarma slices leftover from evening service.'],
+            ],
+            'kushari' => [
+                ['title' => 'Traditional Egyptian Kushari Box', 'description' => 'Large size kushari box with extra tomato sauce and crispy onions packed fresh today.'],
+                ['title' => 'Rice Pudding with Nuts Dessert', 'description' => 'Freshly prepared cold rice pudding cups from the dairy display.'],
+            ],
+            'generic_restaurant' => [
+                ['title' => 'Prepared Mix Appetizers Platter', 'description' => 'Freshly made sambousek and kibbeh platter left over from a catering order.'],
+                ['title' => 'Mixed Oriental Kofta Rice Bowl', 'description' => 'Fresh basmati rice bowl topped with grilled kofta pieces and tahini sauce.'],
+                ['title' => 'Family Size Mix Grill Clearance', 'description' => 'A premium mix of kebab and kofta items left from evening buffet preparation.'],
+            ],
+
+            // --- الكافيهات (Cafes) ---
+            'starbucks' => [
+                ['title' => 'Iced Latte & Sandwich Bundle', 'description' => 'Perfect afternoon combo including a fresh cheese sandwich and a chilled beverage cup.'],
+                ['title' => 'Morning Butter Croissant Clearance', 'description' => 'Classic butter croissants baked fresh this morning.'],
+                ['title' => 'Caramel Macchiato Bakery Combo', 'description' => 'Muffin and sweet bakery item packaged with special promo.'],
+            ],
+            'dunkin' => [
+                ['title' => 'Assorted Glazed Donuts Box', 'description' => '4 pieces of delicious glazed and chocolate donuts remaining from daily display window.'],
+                ['title' => 'Choco Sprinkle Donut Duo', 'description' => 'Two fresh chocolate donuts baked in the morning shift.'],
+            ],
+            'cinnabon' => [
+                ['title' => 'Apple Cinnamon Danish Pastry', 'description' => 'Sweet danish pastry filled with baked apple chunks and cinnamon powder glaze.'],
+                ['title' => 'Classic Cinnabon Roll Clearance', 'description' => 'Fresh cinnabon rolls baked hours ago, perfect for instant microwave heat.'],
+            ],
+            'generic_cafe' => [
+                ['title' => 'Fresh Turkey Club Sandwich', 'description' => 'Turkey and cheddar cold club sandwiches made today.'],
+                ['title' => 'Remaining Chocolate Fudge Brownie', 'description' => 'Rich chocolate brownie squares left from the daily cafe display case.'],
+                ['title' => 'Premium Carrot Cake Slice Promo', 'description' => 'Last fresh slice of premium carrot cake with rich cream cheese frosting.'],
+                ['title' => 'Fresh Blueberry Muffin Pack', 'description' => 'A bakery box containing 2 fluffy blueberry muffins baked in morning shift.'],
+            ],
+
+            // --- المخابز والحلويات (Bakeries) ---
+            'el abd' => [
+                ['title' => 'Traditional Honey Basbousa Tray', 'description' => 'Half a tray of rich oriental basbousa with almonds and pure honey syrup.'],
+                ['title' => 'Mixed Patisserie Eastern Sweet Box', 'description' => 'An assortment of mini gateaux and eastern sweets left from morning production.'],
+                ['title' => 'Kahk and Ghorayeba Small Bag', 'description' => 'Premium Egyptian bakery cookies packed from today\'s window.'],
+            ],
+            'monginis' => [
+                ['title' => 'Sliced Chocolate Fudge Cake', 'description' => 'Last remaining slices of today’s premium chocolate fudge cake from counter.'],
+                ['title' => 'Vanilla Swiss Roll Piece Box', 'description' => 'Freshly sliced vanilla sponge cake rolls leftover.'],
+            ],
+            'generic_bakery' => [
+                ['title' => 'Evening French Baguette Discount', 'description' => '3 pieces of traditional French baguettes baked this afternoon.'],
+                ['title' => 'Soft Milk Dinner Rolls Pack', 'description' => 'A package of 12 soft milk buns and rolls baked early today.'],
+                ['title' => 'Freshly Baked White Toast Bread', 'description' => 'Large sliced white toast bread loaf baked in morning shift.'],
+            ],
+
+            // --- السوبرماركت (Supermarkets) ---
+            'generic_supermarket' => [
+                ['title' => 'Ripe Seasonal Fruit Basket', 'description' => 'A mix of fully ripe apples, bananas, and grapes.'],
+                ['title' => 'Daily Dairy & Yogurt Bundle', 'description' => 'Premium milk bottles and fresh yogurt cups with short expiry dates.'],
+                ['title' => 'Sliced Turkey Cold Cuts Platter', 'description' => 'Smoked turkey and roast beef slices packed today.'],
+                ['title' => 'Grocery Essential Short-Date Pack', 'description' => 'Bundle of premium tomato sauce and organic cooking oil.'],
+                ['title' => 'Healthy Granola & Nut Bars Pack', 'description' => 'A collection of organic protein and fruit granola bars.'],
+            ],
+
+            // --- الفنادق (Hotels) ---
+            'generic_hotel' => [
+                ['title' => 'Lunch Buffet Surplus Ticket', 'description' => 'Voucher to collect a full meal box packed fresh from 5-star open buffet.'],
+                ['title' => 'Late Afternoon High Tea Box', 'description' => 'Luxury afternoon tea sweets, scones, and savory finger sandwiches.'],
+                ['title' => 'Fresh Live-Station Sushi Platter', 'description' => '12 pieces of assorted sushi rolls prepared by executive chef.'],
+                ['title' => 'Premium International Pastry Pack', 'description' => 'A luxury box containing French tarts from morning lounge.'],
             ],
         ];
 
-        // مصفوفة الصور المنوعة اللي موجودة عندك في الـ public/uploads
-        $images = [
-            'restaurant' => ['uploads/images_GradProj/restaurant1.jpg', 'uploads/images_GradProj/restaurant2.jpg', 'uploads/images_GradProj/restaurant3.jpg', 'uploads/images_GradProj/restaurant4.jpg'],
-            'cafe' => ['uploads/images_GradProj/cafe1.jpg', 'uploads/images_GradProj/cafe2.jpg', 'uploads/images_GradProj/cafe3.jpg', 'uploads/images_GradProj/cafe4.jpg', 'uploads/images_GradProj/cafe5.jpg'],
-            'supermarket' => ['uploads/images_GradProj/market1.jpg', 'uploads/images_GradProj/market2.jpg', 'uploads/images_GradProj/market3.jpg', 'uploads/images_GradProj/market4.jpg', 'uploads/images_GradProj/market5.jpg'],
-            'bakery' => ['uploads/images_GradProj/cafe1.jpg', 'uploads/images_GradProj/cafe2.jpg', 'uploads/images_GradProj/cafe3.jpg', 'uploads/images_GradProj/cafe4.jpg', 'uploads/images_GradProj/cafe5.jpg'],
-            'hotel' => ['uploads/images_GradProj/restaurant1.jpg', 'uploads/images_GradProj/restaurant2.jpg', 'uploads/images_GradProj/restaurant3.jpg', 'uploads/images_GradProj/restaurant4.jpg'],
+        // 🎯 خريطة تحدد عدد الصور الفعلي المتاح عندك في فولدر public/uploads لكل براند
+        // (تقدري تعدلي الأرقام دي هنا فوراً لو زودتي أو قللتي عدد الصور لأي براند)
+        $maxImagesPerBrand = [
+            'kfc' => 3,
+            'mcdonalds' => 3,
+            'burger king' => 2,
+            'pizza hut' => 2,
+            'dominos' => 2,
+            'hardees' => 1,
+            'shawarma' => 2,
+            'kushari' => 2,
+            'starbucks' => 3,
+            'dunkin' => 2,
+            'cinnabon' => 2,
+            'el abd' => 3,
+            'monginis' => 2,
+            'generic_restaurant' => 3,
+            'generic_cafe' => 4,
+            'generic_bakery' => 3,
+            'generic_supermarket' => 5,
+            'generic_hotel' => 4,
         ];
-        $statuses = ['active', 'expired', 'disabled'];
 
-        // ✨ كومنت مضاف: هنا عدلنا اللوب لتلف 25 لفة بالظبط عشان ننتج 25 عرض فقط في قاعدة البيانات
-        for ($i = 0; $i < 25; $i++) {
+        $totalOffersCreated = 0;
+        $maxOffers = 100;
 
-            // بننقي فرع عشوائي من الفروع المتاحة
-            $branch = $branches->random();
+        while ($totalOffersCreated < $maxOffers) {
+            foreach ($branches as $branch) {
+                if ($totalOffersCreated >= $maxOffers) {
+                    break;
+                }
 
-            if (!$branch->vendor) {
-                $i--; // لو الفرع ملوش تاجر بنرجع خطوة لضمان اكتمال الـ 25 عرض بالظبط
-                continue;
+                if (!$branch->vendor) {
+                    continue;
+                }
+
+                $vendorType = strtolower(trim($branch->vendor->vendor_type));
+                $businessName = strtolower($branch->vendor->business_name);
+                $originalName = $branch->vendor->business_name;
+
+                if ($vendorType === 'restaurants') {
+                    $vendorType = 'restaurant';
+                }
+                if ($vendorType === 'bakeries') {
+                    $vendorType = 'bakery';
+                }
+                if ($vendorType === 'hotels') {
+                    $vendorType = 'hotel';
+                }
+
+                // ⚡ تحديد الـ Brand Key المظبوط عشان نربطه بالمنيو وبالصور ديناميكياً
+                $brandKey = 'generic_restaurant';
+                $menuPool = [];
+
+                if ($vendorType === 'restaurant') {
+                    if (Str::contains($businessName, 'kfc')) {
+                        $brandKey = 'kfc';
+                    } elseif (Str::contains($businessName, 'mcdonald')) {
+                        $brandKey = 'mcdonalds';
+                    } elseif (Str::contains($businessName, 'burger king')) {
+                        $brandKey = 'burger king';
+                    } elseif (Str::contains($businessName, 'pizza hut')) {
+                        $brandKey = 'pizza hut';
+                    } elseif (Str::contains($businessName, 'domino')) {
+                        $brandKey = 'dominos';
+                    } elseif (Str::contains($businessName, 'hardee')) {
+                        $brandKey = 'hardees';
+                    } elseif (Str::contains($businessName, 'shawarma')) {
+                        $brandKey = 'shawarma';
+                    } elseif (Str::contains($businessName, 'malki') || Str::contains($businessName, 'tariq')) {
+                        $brandKey = 'kushari';
+                    } else {
+                        $brandKey = 'generic_restaurant';
+                    }
+                } elseif ($vendorType === 'cafe') {
+                    if (Str::contains($businessName, 'starbucks')) {
+                        $brandKey = 'starbucks';
+                    } elseif (Str::contains($businessName, 'dunkin')) {
+                        $brandKey = 'dunkin';
+                    } elseif (Str::contains($businessName, 'cinnabon')) {
+                        $brandKey = 'cinnabon';
+                    } else {
+                        $brandKey = 'generic_cafe';
+                    }
+                } elseif ($vendorType === 'bakery') {
+                    if (Str::contains($businessName, 'abd')) {
+                        $brandKey = 'el abd';
+                    } elseif (Str::contains($businessName, 'monginis')) {
+                        $brandKey = 'monginis';
+                    } else {
+                        $brandKey = 'generic_bakery';
+                    }
+                } elseif ($vendorType === 'hotel') {
+                    $brandKey = 'generic_hotel';
+                } else {
+                    $brandKey = 'generic_supermarket';
+                }
+
+                // سحب المنيو بناءً على الـ Brand Key المختار
+                $menuPool = $specificContent[$brandKey] ?? $specificContent['generic_restaurant'];
+
+                // لخبطة المنيو الخاص بالمحل ده قبل التوزيع
+                shuffle($menuPool);
+
+                $availableDishesCount = count($menuPool);
+                $branchOffersCount = rand(1, min($availableDishesCount, 4));
+
+                for ($j = 0; $j < $branchOffersCount; $j++) {
+                    if ($totalOffersCreated >= $maxOffers) {
+                        break;
+                    }
+
+                    $template = $menuPool[$j];
+
+                    // 🔮 حساب رقم الصورة ديناميكياً باستخدام الـ Modulus لضمان عدم الخروج عن النطاق المتاح
+                    $totalBrandImages = $maxImagesPerBrand[$brandKey] ?? 1;
+                    $imageNumber = ($j % $totalBrandImages) + 1;
+
+                    // تحويل اسم البراند لشكل متناسق مع أسماء الملفات (مثال: burger king -> burger-king)
+                    $imageName = Str::slug($brandKey) . $imageNumber . '.jpg';
+                    $dynamicImageUrl = 'uploads/' . $imageName;
+
+                    $originalPrice = rand(120, 500);
+                    $discountPercentage = rand(15, 50) / 100;
+                    $discountPrice = $originalPrice * (1 - $discountPercentage);
+
+                    $randomStatus = fake()->randomElement(['active', 'expired', 'disabled']);
+
+                    $dynamicTitle = $originalName . ' - ' . $template['title'];
+                    $dynamicDescription = $template['description'] . ' Available now at ' . $originalName . '.';
+
+                    offer::create([
+                        'branch_id' => $branch->id,
+                        'title' => $dynamicTitle,
+                        'description' => $dynamicDescription,
+                        'image' => $dynamicImageUrl, // 👈 هنا الصورة الديناميكية الصح المربوطة بالـ Title والـ Type
+                        'quantity_available' => rand(1, 10),
+                        'original_price' => $originalPrice,
+                        'discount_price' => round($discountPrice, 2),
+                        'expiration_time' => Carbon::now()->addHours(rand(2, 15)),
+                        'status' => $randomStatus,
+                    ]);
+
+                    $totalOffersCreated++;
+                }
             }
-
-            $vendorType = strtolower(trim($branch->vendor->vendor_type));
-
-            if ($vendorType === 'restaurants') {
-                $vendorType = 'restaurant';
-            }
-
-            // ✨ كومنت مضاف: شروط تحويل وتأكيد الأنواع الجديدة لتطابق المصفوفات
-            if ($vendorType === 'bakeries') {
-                $vendorType = 'bakery';
-            }
-            if ($vendorType === 'hotels') {
-                $vendorType = 'hotel';
-            }
-
-            if (!array_key_exists($vendorType, $content)) {
-                $vendorType = 'restaurant';
-            }
-
-            // الكود هينقي بشكل عشوائي من الأصناف بتوع النوع الحالي
-            $template = fake()->randomElement($content[$vendorType]);
-            $randomImage = fake()->randomElement($images[$vendorType]);
-
-            $originalPrice = rand(120, 500);
-            $discountPercentage = rand(15, 50) / 100;
-            $discountPrice = $originalPrice * (1 - $discountPercentage);
-            $randomStatus = fake()->randomElement($statuses);
-            $targetDate = Carbon::create(2026, 6, rand(6, 8), rand(10, 23), rand(0, 59));
-
-            offer::create([
-                'branch_id' => $branch->id,
-                'title' => $template['title'],
-                'description' => $template['description'],
-                'image' => $randomImage,
-
-                // 🔥 تعديل الكمية المتاحة لتكون في الرنج المطلوب (من 1 لـ 10 بس)
-                'quantity_available' => rand(1, 10),
-
-                'original_price' => $originalPrice,
-                'discount_price' => round($discountPrice, 2),
-                'expiration_time' => $targetDate,
-                'status' => $randomStatus,
-            ]);
         }
     }
 }

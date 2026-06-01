@@ -3,14 +3,14 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use App\Models\Vendor;
+use App\Models\vendor;
 use App\Models\branch;
 
 class BranchSeeder extends Seeder
 {
     public function run()
     {
-        $vendors = Vendor::all();
+        $vendors = vendor::all();
 
         foreach ($vendors as $vendor) {
             // منطق واقعي: عدد الفروع يعتمد على نوع الـ Vendor
@@ -29,11 +29,11 @@ class BranchSeeder extends Seeder
             for ($i = 1; $i <= $branchCount; $i++) {
                 // تحديد منطقة لكل فرع عشان الواقعية
                 $locations = [
-                    ['name' => 'Main Branch', 'lat' => 30.0444, 'long' => 31.2357], // وسط البلد
-                    ['name' => 'New Cairo Branch', 'lat' => 30.0074, 'long' => 31.4913],
-                    ['name' => 'Sheikh Zayed Branch', 'lat' => 30.0161, 'long' => 30.9833],
-                    ['name' => 'Maadi Branch', 'lat' => 29.9602, 'long' => 31.2569],
-                    ['name' => 'Nasr City Branch', 'lat' => 30.0561, 'long' => 31.3301],
+                    ['name' => '15 Talaat Harb St, Downtown', 'lat' => 30.0444, 'long' => 31.2357], // وسط البلد
+                    ['name' => 'South 90th St, New Cairo', 'lat' => 30.0074, 'long' => 31.4913],
+                    ['name' => 'Central Axis, Sheikh Zayed', 'lat' => 30.0161, 'long' => 30.9833],
+                    ['name' => '21 Road 9, Maadi', 'lat' => 29.9602, 'long' => 31.2569],
+                    ['name' => '45 Abbas El Akkad St, Nasr City', 'lat' => 30.0561, 'long' => 31.3301],
                 ];
 
                 $location = $locations[$i - 1] ?? $locations[0];

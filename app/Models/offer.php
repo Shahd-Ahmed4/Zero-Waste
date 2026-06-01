@@ -67,16 +67,27 @@ class offer extends Model
     }
     public function reduceStock($quantity)
     {
+        // التحقق قبل الخصم
         if ($this->quantity_available < $quantity) {
             throw new \Exception("Insufficient stock for offer: {$this->title}");
         }
 
-        return $this->decrement('quantity_available', $quantity);
+        // خصم الكمية من الداتابيز مباشرة
+        $this->decrement('quantity_available', $quantity);
+
+        // تحديث نسخة الموديل في الذاكرة لتكون مطابقة للداتابيز
+        $this->refresh();
+
+        return true;
     }
 
     public function restoreStock($quantity)
     {
-        return $this->increment('quantity_available', $quantity);
+        // زيادة الكمية في الداتابيز
+        $this->increment('quantity_available', $quantity);
+
+        // تحديث نسخة الموديل
+        $this->refresh();
     }
     public function reviews()
     {
@@ -96,22 +107,22 @@ class offer extends Model
     }
     public function getImageUrlAttribute()
     {
-        if ($this->image) {
-            if (filter_var($this->image, FILTER_VALIDATE_URL)) {
-                return $this->image;
-            }
-
-            // 2. لو المسار جوه الـ uploads الجديد (بتاعنا المباشر)
-            if (str_starts_with($this->image, 'uploads/')) {
-                return asset($this->image);
-            }
-
-            // 3. ده عشان الصور القديمة اللي لسه متخزنة جوه الـ storage ومتمسحتش تشتغل برضه
-            return asset('storage/' . $this->image);
+        // 1. لو الصورة فاضية، رجعي الافتراضي
+        if (!$this->image) {
+            return asset('images/default-placeholder.png');
         }
 
-        // صورة افتراضية لو مفيش صورة للعرض
-        return asset('images/default-placeholder.png');
+        // 2. لو الرابط كامل (مثال: صورة جاية من API خارجي)
+        if (filter_var($this->image, FILTER_VALIDATE_URL)) {
+            return $this->image;
+        }
+
+        // 3. لو الصورة من الـ Seeder الأساسي (موجودة في public/uploads مباشرة)
+        if (str_starts_with($this->image, 'uploads/')) {
+            return asset($this->image);
+        }
+
+        return asset('storage/' . $this->image);
     }
     public function getStatusAttribute()
     {

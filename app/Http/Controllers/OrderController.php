@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use App\Models\offer;
 use App\Services\PaymentService;
 use App\Models\customer;
+use Illuminate\Support\Str;
 
 class OrderController extends Controller
 {
@@ -58,11 +59,16 @@ class OrderController extends Controller
                         $branch->long
                     );
                     // الحد الأدنى للتوصيل 15 جنيه، وكل كيلو بـ 5 جنيه
-                   $deliveryFees = min(50, max(15, round($distanceKm * 3, 2)));
+                    $deliveryFees = min(50, max(15, round($distanceKm * 3, 2)));
                 }
+                // توليد رقم الحجز الفريد
+                do {
+                    $reservationId = 'RES-' . strtoupper(Str::random(6));
+                } while (\App\Models\order::where('reservation_id', $reservationId)->exists());
 
                 // 4. إنشاء الأوردر الأساسي
                 $order = order::create([
+                    'reservation_id' => $reservationId, // 👈 ضيفي السطر ده هنا
                     'customer_id' => $customer->id,
                     'vendor_id' => $vendor->id,
                     'branch_id' => $branch->id, // ربط الأوردر بالفرع مباشرة
@@ -325,27 +331,24 @@ class OrderController extends Controller
     {
         $order = order::with('items.offer')->where('customer_id', auth()->id())->findOrFail($id);
 
-        // العميل يقدر يكنسل لو الطلب لسه مخلصش (pending أو processing)
-        if (\in_array($order->order_status, ['pending', 'processing'])) {
-            try {
-                return DB::transaction(function () use ($order) {
-                    $order->update(['order_status' => 'cancelled']);
+        if (in_array($order->order_status, ['pending', 'processing'])) {
+            return DB::transaction(function () use ($order) {
+                $order->update(['order_status' => 'cancelled']);
 
-                    // ترجيع الاستوك للمخزن
-                    foreach ($order->items as $item) {
-                        $item->offer->restoreStock($item->quantity);
+                foreach ($order->items as $item) {
+                    // جلب العرض المقفول للتعديل لضمان عدم حدوث تضارب
+                    $offer = offer::lockForUpdate()->find($item->offer_id);
+                    if ($offer) {
+                        $offer->restoreStock($item->quantity);
                     }
+                }
 
-                    return response()->json(['message' => 'Order cancelled and stock restored']);
-                });
-            } catch (\Exception $e) {
-                return response()->json(['message' => 'Error during cancellation'], 500);
-            }
+                return response()->json(['message' => 'Order cancelled and stock restored']);
+            });
         }
 
         return response()->json(['message' => 'Cannot cancel this order'], 403);
     }
-
     /**
      * Show the form for editing the specified resource.
      */

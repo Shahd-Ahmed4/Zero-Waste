@@ -76,6 +76,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
 Route::middleware(['auth:sanctum', 'checkadmin'])->group(function () {
+    Route::get('/vendor/branches', [VendorDashboardController::class, 'getVendorBranches']);
     Route::get('/dashboard/stats', [AdminDashboardController::class, 'getOverviewStats']);
     Route::get('/dashboard/earnings', [AdminDashboardController::class, 'getMonthlyEarningsChart']);
     Route::get('/dashboard/activity', [AdminDashboardController::class, 'getRecentActivity']);

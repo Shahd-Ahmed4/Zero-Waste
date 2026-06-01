@@ -10,6 +10,7 @@ use App\Models\payment;
 class order extends Model
 {
     protected $fillable = [
+        'reservation_id',
         'customer_id',
         'vendor_id',
         'branch_id',
