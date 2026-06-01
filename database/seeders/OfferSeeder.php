@@ -8,8 +8,6 @@ use App\Models\branch;
 use App\Models\offer;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
-use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary; // أضيفيها فوق
-
 class OfferSeeder extends Seeder
 {
     public function run()
@@ -237,15 +235,11 @@ class OfferSeeder extends Seeder
 
                     // تحويل اسم البراند لشكل متناسق مع أسماء الملفات (مثال: burger king -> burger-king)
                     $imageName = Str::slug($brandKey) . $imageNumber . '.jpg';
-                    $localImagePath = public_path('uploads/' . $imageName);
 
-                    if (file_exists($localImagePath)) {
-                        // هيرفع الصورة لـ Cloudinary ويرجع الرابط
-                        $dynamicImageUrl = Cloudinary::upload($localImagePath)->getSecurePath();
-                    } else {
-                        // لو الصورة مش موجودة، حطي صورة افتراضية
-                        $dynamicImageUrl = 'https://via.placeholder.com/150';
-                    }
+                    $dynamicImageUrl = file_exists(public_path('uploads/' . $imageName))
+                        ? asset('uploads/' . $imageName)
+                        : asset('uploads/generic-restaurant1.jpg');
+
                     $originalPrice = rand(120, 500);
                     $discountPercentage = rand(15, 50) / 100;
                     $discountPrice = $originalPrice * (1 - $discountPercentage);
