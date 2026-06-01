@@ -119,6 +119,7 @@ Route::middleware(['auth:sanctum', 'checkcustomer'])->group(function () {
     Route::put('/profile/change-password', [CustomerController::class, 'changePassword']);
     Route::delete('customer/delete-profile', [CustomerController::class, 'destroy']);
     Route::post('/orders', [OrderController::class, 'store']); // إنشاء أوردر    //ana wa2fa hnaa 
+    Route::post('/orders/calculate-fee', [OrderController::class, 'calculateFee']);
     Route::get('/my-orders', [OrderController::class, 'index']); // عرض طلباته هو بس
     // عرض تفاصيل أوردر واحد محدد
     Route::get('/orders/{id}', [OrderController::class, 'show']);

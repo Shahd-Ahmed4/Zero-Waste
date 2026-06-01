@@ -282,6 +282,32 @@ class OrderController extends Controller
             ]);
         }
     }
+    public function calculateFee(Request $request)
+    {
+        $request->validate([
+            'customer_lat' => 'required|numeric',
+            'customer_long' => 'required|numeric',
+            'offer_id' => 'required|exists:offers,id',
+        ]);
+
+        // سيبناها offer سمول زي ما هيّ في مشروعك
+        $offer = offer::with('branch')->findOrFail($request->offer_id);
+        $branch = $offer->branch;
+
+        // الدالة دي بتنادي على الـ calculateDistance بتاعتك اللي تحت علطول
+        $distanceKm = $this->calculateDistance(
+            $request->customer_lat,
+            $request->customer_long,
+            $branch->lat,
+            $branch->long
+        );
+        $deliveryFee = max(15, round($distanceKm * 5, 2));
+
+        return response()->json([
+            'delivery_fee' => $deliveryFee,
+            'distance_km' => round($distanceKm, 2),
+        ]);
+    }
 
     // معادلة هافرساين لحساب المسافة بين نقطتين
     private function calculateDistance($lat1, $lon1, $lat2, $lon2)
