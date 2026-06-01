@@ -7,6 +7,7 @@ use App\Models\offer;
 use App\Models\branch;
 use Illuminate\Http\Request;
 use Exception;
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 
 class OfferController extends Controller
 {
@@ -256,13 +257,13 @@ class OfferController extends Controller
             }
 
             // 3. رفع الصورة
+            // 3. رفع الصورة إلى Cloudinary
             if ($request->hasFile('image')) {
-                $file = $request->file('image');
-                // هتحفظ الصورة أوتوماتيك جوه storage/app/public/uploads/offers
-                $path = $file->store('uploads/offers', 'public');
+                // رفع الصورة لـ Cloudinary والحصول على الرابط الآمن
+                $uploadedFileUrl = Cloudinary::upload($request->file('image')->getRealPath())->getSecurePath();
 
-                // سحب المسار عشان يتسيف في الداتابيز
-                $data['image'] = $path;
+                // سحب الرابط عشان يتسيف في الداتابيز
+                $data['image'] = $uploadedFileUrl;
             }
             // Add this right before: $offer = $branch->offers()->create($data);
             if (isset($data['expiration_time'])) {
@@ -284,14 +285,11 @@ class OfferController extends Controller
             }
 
             // تحضير رابط الصورة النهائي في الـ Response
+            // تحضير رابط الصورة النهائي في الـ Response
             if ($offer->image) {
-                // لو الصورة جاية من الـ Vendor هتبدأ بـ uploads/offers، فبنقراها من الـ storage
-                if (str_contains($offer->image, 'offers/')) {
-                    $offer->image = asset('storage/' . $offer->image);
-                } else {
-                    // لو الصورة جاية من الـ Seeder هتبقى uploads/el-abd1.jpg فبنقراها مباشر
-                    $offer->image = asset($offer->image);
-                }
+                // بما أننا نستخدم Cloudinary، فالرابط دائماً سيكون رابطاً خارجياً كاملاً (https://...)
+                // لذا لا نحتاج لـ asset() أو storage()
+                $offer->image = $offer->image;
             }
 
             return response()->json([
