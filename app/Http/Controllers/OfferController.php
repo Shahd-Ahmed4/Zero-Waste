@@ -286,9 +286,7 @@ class OfferController extends Controller
             // تحضير رابط الصورة النهائي في الـ Response
             // تحضير رابط الصورة النهائي في الـ Response
             if ($offer->image) {
-                // بما أننا نستخدم Cloudinary، فالرابط دائماً سيكون رابطاً خارجياً كاملاً (https://...)
-                // لذا لا نحتاج لـ asset() أو storage()
-                $offer->image = $offer->image;
+                $offer->image = url($offer->image);
             }
 
             return response()->json([
@@ -364,11 +362,9 @@ class OfferController extends Controller
         }
         if ($request->hasFile('image')) {
             $file = $request->file('image');
-            // حفظ الصورة أوتوماتيك جوه storage/app/public/uploads/offers
-            $path = $file->store('uploads/offers', 'public');
-
-            // حفظ المسار الجديد في الداتابيز
-            $data['image'] = $path;
+            $imageName = time() . '_' . $file->getClientOriginalName();
+            $file->move(public_path('uploads'), $imageName);
+            $data['image'] = 'uploads/' . $imageName;
         }
 
         if (isset($data['expiration_time'])) {
@@ -377,14 +373,9 @@ class OfferController extends Controller
         $offer->update($data);
 
         if ($offer->image) {
-            // لو الصورة جاية من الـ Vendor (فيها offers/) بنقراها من الـ storage
-            if (str_contains($offer->image, 'offers/')) {
-                $offer->image = asset('storage/' . $offer->image);
-            } else {
-                // لو الصورة جاية من الـ Seeder الأساسي بنقراها مباشر
-                $offer->image = asset($offer->image);
-            }
+            $offer->image = url($offer->image);
         }
+
         return response()->json(['status' => 'success', 'offer' => $offer]);
     }
 

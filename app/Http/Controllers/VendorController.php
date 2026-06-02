@@ -110,21 +110,29 @@ class VendorController extends Controller
         ]);
 
 
-        // 2. رفع اللوجو (لو موجود)
+        // 2. رفع اللوجو
         if ($request->hasFile('logo')) {
-            $vendor->logo = $request->file('logo')->store('vendors/logos', 'public');
+            $file = $request->file('logo');
+            $imageName = time() . '_' . $file->getClientOriginalName();
+            $file->move(public_path('uploads'), $imageName);
+            $vendor->logo = 'uploads/' . $imageName;
         }
 
         // 3. رفع السجل التجاري
         if ($request->hasFile('commercial_register')) {
-            $vendor->commercial_register = $request->file('commercial_register')->store('vendors/docs', 'public');
+            $file = $request->file('commercial_register');
+            $imageName = time() . '_' . $file->getClientOriginalName();
+            $file->move(public_path('uploads'), $imageName);
+            $vendor->commercial_register = 'uploads/' . $imageName;
         }
 
         // 4. رفع البطاقة الضريبية
         if ($request->hasFile('tax_card')) {
-            $vendor->tax_card = $request->file('tax_card')->store('vendors/docs', 'public');
+            $file = $request->file('tax_card');
+            $imageName = time() . '_' . $file->getClientOriginalName();
+            $file->move(public_path('uploads'), $imageName);
+            $vendor->tax_card = 'uploads/' . $imageName;
         }
-
         // 5. حفظ باقي البيانات النصية
         $vendor->update([
             'business_name' => $request->business_name,
@@ -218,15 +226,24 @@ class VendorController extends Controller
         // برفع اللوجو لو موجود
         // 🛠️ استخدام store المضمون للـ Volume
         if ($request->hasFile('logo')) {
-            $data['logo'] = $request->file('logo')->store('vendors/logos', 'public');
+            $file = $request->file('logo');
+            $imageName = time() . '_' . $file->getClientOriginalName();
+            $file->move(public_path('uploads'), $imageName);
+            $data['logo'] = 'uploads/' . $imageName;
         }
 
         if ($request->hasFile('commercial_register')) {
-            $data['commercial_register'] = $request->file('commercial_register')->store('vendors/docs', 'public');
+            $file = $request->file('commercial_register');
+            $imageName = time() . '_' . $file->getClientOriginalName();
+            $file->move(public_path('uploads'), $imageName);
+            $data['commercial_register'] = 'uploads/' . $imageName;
         }
 
         if ($request->hasFile('tax_card')) {
-            $data['tax_card'] = $request->file('tax_card')->store('vendors/docs', 'public');
+            $file = $request->file('tax_card');
+            $imageName = time() . '_' . $file->getClientOriginalName();
+            $file->move(public_path('uploads'), $imageName);
+            $data['tax_card'] = 'uploads/' . $imageName;
         }
 
         $vendor->update($data);

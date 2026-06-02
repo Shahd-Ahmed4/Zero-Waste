@@ -58,8 +58,10 @@ class ReviewController extends Controller
             }
             $imagePath = null;
             if ($request->hasFile('image')) {
-                // بيحفظ الصورة في storage/app/public/reviews/filename.jpg
-                $imagePath = $request->file('image')->store('reviews', 'public');
+                $file = $request->file('image');
+                $imageName = time() . '_' . $file->getClientOriginalName();
+                $file->move(public_path('uploads'), $imageName);
+                $imagePath = 'uploads/' . $imageName;
             }
 
             // 4. Save the review using the customer_id
