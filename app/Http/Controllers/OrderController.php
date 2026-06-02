@@ -53,16 +53,10 @@ class OrderController extends Controller
                 foreach ($request->items as $item) {
                     $offerCheck = offer::with('branch.vendor')->findOrFail($item['offer_id']);
                     if ($offerCheck->branch->vendor_id !== $vendorId) {
-                        return response()->json([
-                            'status' => 'error',
-                            'message' => 'All items must be from the same vendor!'
-                        ], 422);
+                        throw new \Exception('All items must be from the same vendor!');
                     }
                     if ($offerCheck->branch_id !== $branch->id) {
-                        return response()->json([
-                            'status' => 'error',
-                            'message' => 'All items must be from the same branch!'
-                        ], 422);
+                        throw new \Exception('All items must be from the same branch!');
                     }
                 }
 
