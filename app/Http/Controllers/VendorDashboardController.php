@@ -176,19 +176,14 @@ class VendorDashboardController extends Controller
     }
     public function ordersChart(Request $request)
     {
-        $vendorId = auth()->id();
+        $vendor = \App\Models\vendor::where('user_id', auth()->id())->first();
         $branchId = $request->query('branch_id');
 
-        $query = order::whereHas('offer', function ($q) use ($vendorId) {
-            $q->whereHas('branch', function ($q2) use ($vendorId) {
-                $q2->where('vendor_id', $vendorId);
-            });
-        });
+        $query = order::where('vendor_id', $vendor->id)
+            ->whereYear('created_at', now()->year);
 
         if ($branchId) {
-            $query->whereHas('offer', function ($q) use ($branchId) {
-                $q->where('branch_id', $branchId);
-            });
+            $query->where('branch_id', $branchId);
         }
 
         $orders = $query->selectRaw('DATE(created_at) as date, COUNT(*) as total_orders')
@@ -197,5 +192,6 @@ class VendorDashboardController extends Controller
             ->get();
 
         return response()->json(['data' => $orders]);
+
     }
 }
