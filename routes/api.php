@@ -51,7 +51,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/vendor/orders', [VendorController::class, 'getOrdersForMe']);
         Route::patch('/vendor/orders/{id}/status', [OrderController::class, 'updateStatus']);
         // عرض قائمة المبيعات (Order Items)
-
+        Route::get('/vendor/branches', [VendorDashboardController::class, 'getVendorBranches']);
+        Route::get('/vendor/dashboard/orders-chart', [VendorDashboardController::class, 'ordersChart']);
         Route::get('/vendor/dashboard/overview', [VendorDashboardController::class, 'getOverviewStats']);
         Route::get('/vendor/dashboard/monthly-chart', [VendorDashboardController::class, 'getMonthlySalesChart']);
 
@@ -76,7 +77,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
 Route::middleware(['auth:sanctum', 'checkadmin'])->group(function () {
-    Route::get('/vendor/branches', [VendorDashboardController::class, 'getVendorBranches']);
     Route::get('/dashboard/stats', [AdminDashboardController::class, 'getOverviewStats']);
     Route::get('/dashboard/earnings', [AdminDashboardController::class, 'getMonthlyEarningsChart']);
     Route::get('/dashboard/activity', [AdminDashboardController::class, 'getRecentActivity']);

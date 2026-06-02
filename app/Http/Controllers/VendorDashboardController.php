@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\order;
 use Illuminate\Http\Request;
 use App\Models\order_item;
 use App\Models\offer;
@@ -173,4 +174,30 @@ class VendorDashboardController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Something went wrong!'], 500);
         }
     }
+    public function ordersChart(Request $request)
+    {
+        $vendorId = auth()->id();
+        $branchId = $request->query('branch_id');
+
+        $query = order::whereHas('offer', function ($q) use ($vendorId) {
+            $q->whereHas('branch', function ($q2) use ($vendorId) {
+                $q2->where('vendor_id', $vendorId);
+            });
+        })
+            ->whereYear('created_at', now()->year);
+
+        if ($branchId) {
+            $query->whereHas('offer', function ($q) use ($branchId) {
+                $q->where('branch_id', $branchId);
+            });
+        }
+
+        $orders = $query->selectRaw('DATE(created_at) as date, COUNT(*) as total_orders')
+            ->groupBy('date')
+            ->orderBy('date')
+            ->get();
+
+        return response()->json(['data' => $orders]);
+    }
+
 }
