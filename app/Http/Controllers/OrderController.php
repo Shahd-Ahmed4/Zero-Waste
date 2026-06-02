@@ -342,21 +342,61 @@ class OrderController extends Controller
      */
     public function cancel($id)
     {
-        $order = order::with('items.offer')->where('customer_id', auth()->id())->findOrFail($id);
+        $customer = customer::where('user_id', auth()->id())->first();
+
+        if (!$customer) {
+            return response()->json(['message' => 'Customer not found'], 404);
+        }
+
+        $order = order::with('items.offer', 'payment')
+            ->where('customer_id', $customer->id)
+            ->findOrFail($id);
 
         if (in_array($order->order_status, ['pending', 'processing'])) {
-            return DB::transaction(function () use ($order) {
+            return DB::transaction(function () use ($order, $customer) {
                 $order->update(['order_status' => 'cancelled']);
 
+                // 🔄 رجوع الستوك
                 foreach ($order->items as $item) {
-                    // جلب العرض المقفول للتعديل لضمان عدم حدوث تضارب
                     $offer = offer::lockForUpdate()->find($item->offer_id);
                     if ($offer) {
                         $offer->restoreStock($item->quantity);
                     }
                 }
 
-                return response()->json(['message' => 'Order cancelled and stock restored']);
+                // 💳 لو الدفع كان بكارت، ارجع الفلوس
+                if ($order->payment_method === 'card' && $order->payment) {
+                    try {
+                        \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+
+                        \Stripe\Refund::create([
+                            'payment_intent' => $order->payment->transaction_id,
+                        ]);
+
+                        // تحديث حالة الـ payment
+                        $order->payment->update(['payment_status' => 'refunded']);
+
+                    } catch (\Exception $e) {
+                        // لو الـ refund فشل، متكملش الكانسل
+                        throw new \Exception('Refund failed: ' . $e->getMessage());
+                    }
+                }
+
+                // 🔔 إشعار للكاستومر
+                $message = $order->payment_method === 'card'
+                    ? "Order #{$order->id} cancelled and your money has been refunded."
+                    : "Order #{$order->id} has been cancelled.";
+
+                \App\Models\notification::create([
+                    'user_id' => $customer->user_id,
+                    'message' => $message,
+                    'type' => 'order',
+                ]);
+
+                return response()->json([
+                    'message' => 'Order cancelled and stock restored',
+                    'refund' => $order->payment_method === 'card' ? 'Refund initiated' : 'No refund needed (cash)'
+                ]);
             });
         }
 
