@@ -40,25 +40,25 @@ class OrderController extends Controller
                 'customer_long' => 'required_if:delivery_type,delivery',
                 'payment_method_id' => 'required_if:payment_method,card',
             ]);
+            $firstOffer = offer::with('branch.vendor')->findOrFail($request->items[0]['offer_id']);
+            $branch = $firstOffer->branch;
+            $vendor = $branch->vendor;
+            // تأكد إن كل الـ offers من نفس الـ vendor
+            $vendorId = $vendor->id;
+            foreach ($request->items as $item) {
+                $offerCheck = offer::with('branch.vendor')->findOrFail($item['offer_id']);
+                if ($offerCheck->branch->vendor_id !== $vendorId) {
+                    throw new \Exception('All items must be from the same vendor!');
+                }
+                if ($offerCheck->branch_id !== $branch->id) {
+                    throw new \Exception('All items must be from the same branch!');
+                }
+            }
 
             // استخدام الـ Transaction عشان لو حصلت مشكلة في النص، مفيش داتا تضرب
-            return DB::transaction(function () use ($request, $customer) {
-
+            return DB::transaction(function () use ($request, $customer, $branch, $vendor) {
                 // 2. الوصول لأول عرض عشان نعرف الفرع والفيندور
-                $firstOffer = offer::with('branch.vendor')->findOrFail($request->items[0]['offer_id']);
-                $branch = $firstOffer->branch;
-                $vendor = $branch->vendor;
-                // تأكد إن كل الـ offers من نفس الـ vendor
-                $vendorId = $vendor->id;
-                foreach ($request->items as $item) {
-                    $offerCheck = offer::with('branch.vendor')->findOrFail($item['offer_id']);
-                    if ($offerCheck->branch->vendor_id !== $vendorId) {
-                        throw new \Exception('All items must be from the same vendor!');
-                    }
-                    if ($offerCheck->branch_id !== $branch->id) {
-                        throw new \Exception('All items must be from the same branch!');
-                    }
-                }
+
 
                 // 3. حساب مصاريف التوصيل بناءً على موقع الفرع (Branch)
                 $deliveryFees = 0;
@@ -97,10 +97,12 @@ class OrderController extends Controller
                 $total = 0;
                 foreach ($request->items as $item) {
                     // عمل Lock على السطر في الداتابيز عشان نمنع تضارب الطلبات في نفس الوقت
-                    $offer = offer::lockForUpdate()->find($item['offer_id']);
-
-                    // خصم الكمية من الموديل (تأكدي من وجود ميثود reduceStock في موديل Offer)
-                    $offer->reduceStock($item['quantity']);
+                    $offer = offer::lockForUpdate()->findOrFail($item['offer_id']);
+                    if ($offer->quantity_available < $item['quantity']) {
+                        throw new \Exception("Insufficient stock for offer: {$offer->title}");
+                    }
+                    $offer->decrement('quantity_available', $item['quantity']);
+                    $offer->refresh();
                     $itemPrice = $offer->discount_price;
 
                     $total += ($itemPrice * $item['quantity']);
