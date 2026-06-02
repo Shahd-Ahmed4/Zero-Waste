@@ -33,7 +33,9 @@ class OrderController extends Controller
             }
             // 1. التأكد من صحة البيانات المرسلة من الفرونت إند
             $request->validate([
-                'items' => 'required|array',
+                'items' => 'required|array|min:1',
+                'items.*.offer_id' => 'required|integer|exists:offers,id', // ✅ زيدي ده
+                'items.*.quantity' => 'required|integer|min:1',
                 'payment_method' => 'required|in:card,cash',
                 'delivery_type' => 'required|in:pickup,delivery',
                 'customer_lat' => 'required_if:delivery_type,delivery',
