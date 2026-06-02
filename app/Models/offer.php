@@ -119,7 +119,7 @@ class offer extends Model
 
         // 3. لو الصورة من الـ Seeder الأساسي (موجودة في public/uploads مباشرة)
         if (str_starts_with($this->image, 'uploads/')) {
-            return asset($this->image);
+            return url($this->image); // بدل asset()
         }
 
         return asset('storage/' . $this->image);
