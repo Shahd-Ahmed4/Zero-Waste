@@ -11,8 +11,7 @@ use App\Models\vendor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Auth;
-use illuminate\Support\Facades\Hash;
-class AdminController extends Controller
+use Illuminate\Support\Facades\Hash; // ✅ Illuminate بحرف كبيرclass AdminController extends Controller
 {
     /**
      * Display a listing of the resource.
