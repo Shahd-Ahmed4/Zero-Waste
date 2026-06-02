@@ -180,14 +180,14 @@ class VendorDashboardController extends Controller
         $branchId = $request->query('branch_id');
 
         $query = order::where('vendor_id', $vendor->id)
-            ->whereYear('created_at', now()->year);
+            ->whereYear('order_date', now()->year);
 
         if ($branchId) {
             $query->where('branch_id', $branchId);
         }
 
-        $orders = $query->selectRaw('DATE(created_at) as date, COUNT(*) as total_orders')
-            ->groupBy(DB::raw('DATE(created_at)'))
+        $orders = $query->selectRaw('DATE(order_date) as date, COUNT(*) as total_orders')
+            ->groupBy(DB::raw('DATE(order_date)'))
             ->orderBy('date')
             ->get();
 
