@@ -238,9 +238,7 @@ class OfferSeeder extends Seeder
 
                     $localImagePath = public_path('uploads/' . $imageName);
 
-                    $dynamicImageUrl = file_exists($localImagePath)
-                        ? 'uploads/' . $imageName
-                        : 'uploads/' . Str::slug($brandKey) . '1.jpg';
+                    $dynamicImageUrl = 'uploads/' . $imageName;
 
                     $originalPrice = rand(120, 500);
                     $discountPercentage = rand(15, 50) / 100;
