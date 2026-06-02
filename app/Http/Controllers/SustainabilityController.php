@@ -42,7 +42,7 @@ class SustainabilityController extends Controller
             })
                 ->join('orders', 'order_items.order_id', '=', 'orders.id')
                 ->selectRaw('MONTHNAME(orders.order_date) as month, MONTH(orders.order_date) as month_num, SUM(order_items.quantity) as meals')
-                ->groupBy('month','month_num')
+                ->groupBy('month', 'month_num')
                 ->orderBy('month_num', 'asc')
                 ->get()
                 ->map(function ($item) {
@@ -74,18 +74,21 @@ class SustainabilityController extends Controller
     public function getVendorMetrics(Request $request)
     {
         try {
-            // بنجيب الـ Vendor المرتبط بالمستخدم اللي عامل Login
             $vendorId = auth()->user()->vendor->id;
 
-            // وجبات المحل ده بالذات اللي أنقذها
-            $mealsSaved = order_item::whereHas('order', function ($q) use ($vendorId) {
-                $q->where('order_status', 'completed')->where('vendor_id', $vendorId);
-            })->sum('quantity');
+            // لو في branch_id في الـ request، هيجيب metrics الـ branch ده بس
+            $query = order_item::whereHas('order', function ($q) use ($vendorId, $request) {
+                $q->where('order_status', 'completed')
+                    ->where('vendor_id', $vendorId);
+                if ($request->has('branch_id')) {
+                    $q->where('branch_id', $request->branch_id);
+                }
+            });
 
-            // الأرباح المستردة للمحل ده
-            $recoveredRevenue = order_item::whereHas('order', function ($q) use ($vendorId) {
-                $q->where('order_status', 'completed')->where('vendor_id', $vendorId);
-            })->selectRaw('SUM(price * quantity) as total')->value('total') ?? 0;
+            $mealsSaved = $query->sum('quantity');
+
+            $recoveredRevenue = $query->selectRaw('SUM(price * quantity) as total')
+                ->value('total') ?? 0;
 
             $co2Prevented = $mealsSaved * $this->co2Factor;
 
@@ -98,6 +101,7 @@ class SustainabilityController extends Controller
                     'green_badge' => $mealsSaved >= 50 ? 'Eco-Friendly Partner' : 'Rising Sustainability Hero'
                 ]
             ]);
+
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
