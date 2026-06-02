@@ -48,6 +48,23 @@ class OrderController extends Controller
                 $firstOffer = offer::with('branch.vendor')->findOrFail($request->items[0]['offer_id']);
                 $branch = $firstOffer->branch;
                 $vendor = $branch->vendor;
+                // تأكد إن كل الـ offers من نفس الـ vendor
+                $vendorId = $vendor->id;
+                foreach ($request->items as $item) {
+                    $offerCheck = offer::with('branch.vendor')->findOrFail($item['offer_id']);
+                    if ($offerCheck->branch->vendor_id !== $vendorId) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' => 'All items must be from the same vendor!'
+                        ], 422);
+                    }
+                    if ($offerCheck->branch_id !== $branch->id) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' => 'All items must be from the same branch!'
+                        ], 422);
+                    }
+                }
 
                 // 3. حساب مصاريف التوصيل بناءً على موقع الفرع (Branch)
                 $deliveryFees = 0;
