@@ -217,7 +217,6 @@ class OfferSeeder extends Seeder
                 $menuPool = $specificContent[$brandKey] ?? $specificContent['generic_restaurant'];
 
                 // لخبطة المنيو الخاص بالمحل ده قبل التوزيع
-                shuffle($menuPool);
 
                 $availableDishesCount = count($menuPool);
                 $branchOffersCount = rand(1, min($availableDishesCount, 4));
