@@ -95,6 +95,7 @@ Route::middleware(['auth:sanctum', 'checkadmin'])->group(function () {
         Route::post('/admin/vendor/{id}/reject', [AdminController::class, 'reject']);  //yrfod vendor
         Route::patch('/admin/users/{id}/block', [AdminController::class, 'blockUser']);
         Route::patch('/admin/users/{id}/unblock', [AdminController::class, 'unblockUser']);
+        Route::get('/admin/reviews', [AdminController::class, 'listAllReviews']);
         Route::patch('/reviews/{id}/toggle-visibility', [AdminController::class, 'toggleVisibility']);
 
         Route::middleware(['checkadmin:super_admin'])->group(function () {

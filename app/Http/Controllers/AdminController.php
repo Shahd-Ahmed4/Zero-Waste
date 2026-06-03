@@ -18,7 +18,7 @@ class AdminController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()  
+    public function index()
     {
         $customers = User::where('role', 'customer')
             ->with('customer')
@@ -86,7 +86,7 @@ class AdminController extends Controller
             $query->where('status', 'pending');
         })
             ->with('user')
-            ->where('id', $id) 
+            ->where('id', $id)
             ->first();
 
         if (!$vendor) {
@@ -112,7 +112,7 @@ class AdminController extends Controller
                 return response()->json([
                     'status' => 'error',
                     'message' => 'The authenticated user does not have an Admin profile.'
-                ], 403); 
+                ], 403);
             }
 
             $vendor->update([
@@ -397,6 +397,17 @@ class AdminController extends Controller
             'message' => 'Review visibility updated successfully!',
             'is_visible' => $review->is_visible
         ], 200);
+    }
+    public function listAllReviews()
+    {
+        $reviews = review::with([
+            'customer.user:id,name',
+            'offer:id,title'
+        ])
+            ->latest()
+            ->paginate(10);
+
+        return response()->json(['success' => true, 'data' => $reviews]);
     }
 }
 
