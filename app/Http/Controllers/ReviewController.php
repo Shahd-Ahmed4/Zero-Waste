@@ -74,7 +74,7 @@ class ReviewController extends Controller
                 'is_visible' => true,        // بيظهر أوتوماتيك إلا لو الأدمن أخفاه
             ]);
             if ($review->image) {
-                $review->image = asset('storage/' . $review->image);
+                $review->image = asset($review->image);
             }
 
             return response()->json([
