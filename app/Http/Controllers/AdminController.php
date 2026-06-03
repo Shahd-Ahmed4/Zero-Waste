@@ -18,24 +18,20 @@ class AdminController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()  // hygbly kol el customers
+    public function index()  
     {
-        // بنجيب المستخدمين اللي نوعهم كاستمر ومعاهم علاقة الـ customer من الداتابيز
         $customers = User::where('role', 'customer')
             ->with('customer')
             ->get()
             ->map(function ($user) {
                 return [
-                    // 🟢 الـ id بتاع الكاستمر الفعلي من جدول customers
                     'id' => $user->customer ? $user->customer->id : null,
 
-                    // 🟢 الـ user_id الصريح اللي هما عايزينه
                     'user_id' => $user->id,
 
                     'name' => $user->name,
                     'email' => $user->email,
 
-                    // 🟢 بنقراهم من الـ $user علطول لأنهم عندك في جدول الـ users
                     'phone' => $user->phone,
                     'address' => $user->address,
 
@@ -57,22 +53,18 @@ class AdminController extends Controller
      */
     public function pendingVendors()
     {
-        // 1. بنجيب الـ vendors اللي الـ user بتاعهم حالته pending في جدول الـ users
         $pendingVendors = vendor::whereHas('user', function ($query) {
             $query->where('status', 'pending');
         })
             ->with([
                 'user' => function ($query) {
-                    // بنجيب البيانات الأساسية لليوزر عشان تظهر للأدمن
                     $query->select('id', 'name', 'email', 'phone');
                 }
             ])
-            // 2. الحقول اللي إنتي عايزاها بالظبط من جدول الـ Vendor (متطابقة 100% مع المايجريشن)
             ->select('id', 'user_id', 'business_name', 'logo', 'vendor_type', 'created_at')
             ->latest()
             ->get();
 
-        // 3. لو مفيش أي فيندور معلق، بنرجع ريسبونس فاضي نضيف
         if ($pendingVendors->isEmpty()) {
             return response()->json([
                 'status' => 'success',
@@ -81,7 +73,6 @@ class AdminController extends Controller
             ]);
         }
 
-        // 4. نبعت الداتا المتفلترة صح
         return response()->json([
             'status' => 'success',
             'count' => $pendingVendors->count(),
@@ -89,20 +80,15 @@ class AdminController extends Controller
         ]);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function showPendingDocs($id)
     {
-        // بنجيب التاجر بشرط يكون الـ user بتاعه حالته pending في جدول الـ users
         $vendor = vendor::whereHas('user', function ($query) {
             $query->where('status', 'pending');
         })
             ->with('user')
-            ->where('id', $id) // بنجيب الفيندور بالـ ID بتاعه
+            ->where('id', $id) 
             ->first();
 
-        // لو الفيندور مش موجود أو حالته مش pending هيرجع 404 نضيفة
         if (!$vendor) {
             return response()->json([
                 'status' => 'error',
@@ -110,7 +96,6 @@ class AdminController extends Controller
             ], 404);
         }
 
-        // يرجع الداتا والأوراق القانونية زي السجل والبطاقة واللوجو
         return response()->json([
             'status' => 'success',
             'data' => $vendor
@@ -121,27 +106,23 @@ class AdminController extends Controller
         try {
             $vendor = vendor::findOrFail($id);
 
-            // 1. بنجيب الـ Admin Profile بتاع المستخدم اللي عامل Login حالياً
             $adminProfile = auth()->user()->admin;
 
             if (!$adminProfile) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'The authenticated user does not have an Admin profile.'
-                ], 403); // 🟢 تعديل الـ status code لـ 403 صريحة بدل متغير الـ id
+                ], 403); 
             }
 
-            // 2. بنحدث جدول الـ vendors بالـ ID الصح بتاع جدول الـ admins
             $vendor->update([
                 'admin_id' => $adminProfile->id,
             ]);
 
-            // 3. بنفعل الـ status في جدول الـ users بالأقواس عشان يسمع لايف 🟢
             $vendor->user()->update([
                 'status' => 'active'
             ]);
 
-            // 4. بنجبر لارافيل يسحب الداتا الجديدة الفرش اللي نزلت الداتابيز حالا 🟢
             $vendor->refresh();
 
             return response()->json([
@@ -158,10 +139,6 @@ class AdminController extends Controller
             ], 500);
         }
     }
-
-    /**
-     * رفض التاجر مع ذكر السبب
-     */
     public function reject($id)
     {
         try {

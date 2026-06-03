@@ -140,6 +140,7 @@ class OfferSeeder extends Seeder
 
         $totalOffersCreated = 0;
         $maxOffers = 100;
+        $disabledCount = 0;
 
         while ($totalOffersCreated < $maxOffers) {
             foreach ($branches as $branch) {
@@ -239,14 +240,33 @@ class OfferSeeder extends Seeder
 
                     $dynamicImageUrl = 'uploads/' . $imageName;
 
-                    $originalPrice = rand(120, 500);
+                    $originalPrice = match ($vendorType) {
+                        'restaurant' => rand(120, 250),
+                        'cafe' => rand(90, 180),
+                        'bakery' => rand(40, 120),
+                        'hotel' => rand(150, 400),
+                        default => rand(50, 200),
+                    };
                     $discountPercentage = rand(15, 50) / 100;
                     $discountPrice = $originalPrice * (1 - $discountPercentage);
 
-                    $randomStatus = fake()->randomElement(['active', 'expired', 'disabled']);
 
                     $dynamicTitle = $originalName . ' - ' . $template['title'];
                     $dynamicDescription = $template['description'] . ' Available now at ' . $originalName . '.';
+                    $randomStatus = ($disabledCount < 5 && ($totalOffersCreated === 0 || rand(0, 1)))
+                        ? 'disabled'
+                        : 'active';
+
+                    if ($randomStatus === 'disabled') {
+                        $disabledCount++;
+                    }
+                    $expirationHours = match ($vendorType) {
+                        'restaurant' => rand(12, 16),
+                        'cafe' => rand(12, 18),
+                        'bakery' => rand(16, 20),
+                        'hotel' => rand(14, 18),
+                        default => rand(20, 24),
+                    };
 
                     offer::create([
                         'branch_id' => $branch->id,
@@ -256,7 +276,7 @@ class OfferSeeder extends Seeder
                         'quantity_available' => rand(1, 10),
                         'original_price' => $originalPrice,
                         'discount_price' => round($discountPrice, 2),
-                        'expiration_time' => Carbon::now()->addHours(rand(2, 15)),
+                        'expiration_time' => Carbon::parse('2026-06-07 10:00:00')->addHours($expirationHours),
                         'status' => $randomStatus,
                     ]);
 
