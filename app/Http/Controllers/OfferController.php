@@ -20,7 +20,7 @@ class OfferController extends Controller
             $user = auth('sanctum')->user();
 
             // 1. نبدأ بـ Query أساسي ونحدد صراحة أننا نريد معرف العرض أولاً لتجنب تضارب الجداول
-            $query = offer::query()->select('offers.id', 'offers.title', 'offers.description', 'offers.image', 'offers.original_price', 'offers.discount_price', 'offers.expiration_time', 'offers.status', 'offers.branch_id', 'offers.created_at')
+            $query = offer::query()->select('offers.id', 'offers.title', 'offers.description', 'offers.image','offers.quantity_available', 'offers.original_price', 'offers.discount_price', 'offers.expiration_time', 'offers.status', 'offers.branch_id', 'offers.created_at')
                 ->withAvg('reviews', 'rating')
                 ->with([
                     'branch' => function ($q) {
