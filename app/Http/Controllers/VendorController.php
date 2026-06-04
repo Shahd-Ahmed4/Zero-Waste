@@ -362,7 +362,7 @@ class VendorController extends Controller
     {
         $vendor = Auth::user()->vendor;
 
-        $reviews = review::with(['customer:id,name', 'offer:id,title,branch_id', 'offer.branch:id,branch_name'])
+        $reviews = review::with(['customer.user:id,name', 'offer:id,title,branch_id', 'offer.branch:id,branch_name'])
             ->whereHas('offer.branch', function ($query) use ($vendor) {
                 $query->where('vendor_id', $vendor->id);
             })
