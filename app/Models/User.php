@@ -28,7 +28,7 @@ class User extends Authenticatable
         'address',
         'role',
         'reset_code',
-        'reset_code_expires_at', // Added for OTP expiry
+        'reset_code_expires_at', 
     ];
     public function customer()
     {
@@ -59,7 +59,7 @@ class User extends Authenticatable
     ];
 
     /**
-     * Get the attributes that should be cast.
+    
      *
      * @return array<string, string>
      */

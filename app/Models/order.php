@@ -15,16 +15,16 @@ class order extends Model
         'vendor_id',
         'branch_id',
         'order_status',
-        'delivery_type',   // ضيفي ده
-        'delivery_address',// ضيفي ده
-        'delivery_fees',   // ضيفي ده
+        'delivery_type',   
+        'delivery_address',
+        'delivery_fees',   
         'commission_fee',
         'total_amount',
         'payment_method',
         'order_date'
     ];
     protected $casts = [
-        'order_date' => 'datetime', // عشان تقدري تستخدمي عليه functions التاريخ
+        'order_date' => 'datetime', 
     ];
     public function customer()
     {

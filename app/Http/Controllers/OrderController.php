@@ -12,12 +12,10 @@ use Illuminate\Support\Str;
 
 class OrderController extends Controller
 {
-    /**
-     * Store a newly created resource in storage.
-     */
+    
     protected PaymentService $paymentService;
 
-    // بنحقن الـ PaymentService عشان نستخدمها في الدفع الإلكتروني
+   
     public function __construct(PaymentService $paymentService)
     {
         $this->paymentService = $paymentService;
@@ -31,10 +29,10 @@ class OrderController extends Controller
             if (!$customer) {
                 return response()->json(['message' => 'This user does not have a customer account.'], 404);
             }
-            // 1. التأكد من صحة البيانات المرسلة من الفرونت إند
+           
             $request->validate([
                 'items' => 'required|array|min:1',
-                'items.*.offer_id' => 'required|integer|exists:offers,id', // ✅ زيدي ده
+                'items.*.offer_id' => 'required|integer|exists:offers,id', 
                 'items.*.quantity' => 'required|integer|min:1',
                 'payment_method' => 'required|in:card,cash',
                 'delivery_type' => 'required|in:pickup,delivery',
@@ -45,7 +43,7 @@ class OrderController extends Controller
             $firstOffer = offer::with('branch.vendor')->findOrFail($request->items[0]['offer_id']);
             $branch = $firstOffer->branch;
             $vendor = $branch->vendor;
-            // تأكد إن كل الـ offers من نفس الـ vendor
+            
             $vendorId = $vendor->id;
             foreach ($request->items as $item) {
                 $offerCheck = offer::with('branch.vendor')->findOrFail($item['offer_id']);
@@ -56,13 +54,9 @@ class OrderController extends Controller
                     throw new \Exception('All items must be from the same branch!');
                 }
             }
-
-            // استخدام الـ Transaction عشان لو حصلت مشكلة في النص، مفيش داتا تضرب
+           
             return DB::transaction(function () use ($request, $customer, $branch, $vendor) {
-                // 2. الوصول لأول عرض عشان نعرف الفرع والفيندور
-
-
-                // 3. حساب مصاريف التوصيل بناءً على موقع الفرع (Branch)
+                
                 $deliveryFees = 0;
                 if ($request->delivery_type === 'delivery') {
                     $distanceKm = $this->calculateDistance(
@@ -71,34 +65,34 @@ class OrderController extends Controller
                         $branch->lat,
                         $branch->long
                     );
-                    // الحد الأدنى للتوصيل 15 جنيه، وكل كيلو بـ 5 جنيه
+                    
                     $deliveryFees = min(50, max(15, round($distanceKm * 3, 2)));
                 }
-                // توليد رقم الحجز الفريد
+               
                 do {
                     $reservationId = 'RES-' . strtoupper(Str::random(6));
                 } while (\App\Models\order::where('reservation_id', $reservationId)->exists());
 
-                // 4. إنشاء الأوردر الأساسي
+                
                 $order = order::create([
-                    'reservation_id' => $reservationId, // 👈 ضيفي السطر ده هنا
+                    'reservation_id' => $reservationId, 
                     'customer_id' => $customer->id,
                     'vendor_id' => $vendor->id,
-                    'branch_id' => $branch->id, // ربط الأوردر بالفرع مباشرة
+                    'branch_id' => $branch->id, 
                     'order_status' => 'pending',
                     'delivery_type' => $request->delivery_type,
                     'delivery_address' => $request->delivery_address,
                     'delivery_fees' => $deliveryFees,
-                    'commission_fee' => 0, // قيمة مبدئية
+                    'commission_fee' => 0, 
                     'payment_method' => $request->payment_method,
                     'total_amount' => 0,
                     'order_date' => now(),
                 ]);
 
-                // 5. إضافة الأصناف وخصمها من مخزن الفرع
+                
                 $total = 0;
                 foreach ($request->items as $item) {
-                    // عمل Lock على السطر في الداتابيز عشان نمنع تضارب الطلبات في نفس الوقت
+                    
                     $offer = offer::lockForUpdate()->findOrFail($item['offer_id']);
                     if ($offer->quantity_available < $item['quantity']) {
                         throw new \Exception("Insufficient stock for offer: {$offer->title}");
@@ -112,35 +106,34 @@ class OrderController extends Controller
                     $order->items()->create([
                         'offer_id' => $offer->id,
                         'quantity' => $item['quantity'],
-                        'original_price' => $offer->original_price, // <- السعر الأصلي سحبناه من العرض وتثبت هنا
+                        'original_price' => $offer->original_price, 
                         'price' => $itemPrice,
                     ]);
                 }
-                // 🧮 6. حسبة العمولة بدقة (6% من إجمالي تمن الأكل الصافي)
+               
                 $customerCommission = round($total * 0.06, 2);
-                // إجمالي المبلغ النهائي الشامل (الأكل + عمولتنا + الدليفري)
+               
                 $finalTotalAmount = $total + $customerCommission + $deliveryFees;
 
                 $order->update([
-                    'commission_fee' => $customerCommission, // 👈 حفظنا قيمة الـ 6% لوحدها بالفلس
+                    'commission_fee' => $customerCommission, 
                     'total_amount' => $finalTotalAmount
                 ]);
 
-                // 🎯 7. التعامل مع الدفع (التعديل الجوهري هنا)
+               
                 if ($request->payment_method === 'card') {
                     try {
-                        // بننادي على Stripe عشان يعمل الـ السحب الفوري (PaymentIntent)
-                        // ملحوظة: تأكدي من عمل الـ use لـ \Stripe\Stripe فوق أو سيبيها كدة
+                      
                         \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
 
                         $charge = \Stripe\PaymentIntent::create([
-                            'amount' => (int) ($order->total_amount * 100), // بالقروش
+                            'amount' => (int) ($order->total_amount * 100), 
                             'currency' => 'egp',
                             'payment_method' => $request->payment_method_id,
-                            'confirm' => true, // سحب لايف في نفس الثانية
+                            'confirm' => true, 
                             'automatic_payment_methods' => [
                                 'enabled' => true,
-                                'allow_redirects' => 'never' // عشان يفضل العميل جوه شاشة الأبلكيشن
+                                'allow_redirects' => 'never' 
                             ],
                             'metadata' => [
                                 'order_id' => $order->id,
@@ -148,20 +141,20 @@ class OrderController extends Controller
                             ]
                         ]);
 
-                        // ✅ لو الدفع تم بنجاح والفلوس اتسحبت فعلياً
+                        
                         if ($charge->status === 'succeeded') {
                             \App\Models\payment::create([
                                 'order_id' => $order->id,
-                                'transaction_id' => $charge->id, // الـ ID الحقيقي للعملية من Stripe
+                                'transaction_id' => $charge->id, 
                                 'amount' => $order->total_amount,
                                 'payment_status' => 'completed',
                                 'payment_method' => 'card'
                             ]);
 
-                            // الأوردر مدفوع وجاهز.. يتحول فوراً لـ "قيد التحضير"
+                          
                             $order->update(['order_status' => 'processing']);
 
-                            // إرسال الإشعارات الفورية
+                            
                             \App\Models\notification::create([
                                 'user_id' => $customer->user_id,
                                 'message' => "Payment successful! Order #{$order->id} is being prepared.",
@@ -180,25 +173,24 @@ class OrderController extends Controller
                                 'order' => $order->refresh()->load('items')
                             ], 201);
                         } else {
-                            // لو الـ status رجع أي حاجة مش نجاح (رمي Exception عشان الـ Transaction تقلب)
+                            
                             throw new \Exception('Stripe payment status: ' . $charge->status);
                         }
 
                     } catch (\Exception $e) {
-                        // 🟢 هنا حماية الداتابيز: لو كارت العميل اترفض، الـ Exception ده هيطير 
-                        // والـ DB::transaction هتعمل أوتوماتيكياً Rollback وتمسح الأوردر وترجع الـ Stock
+                        
                         throw new \Exception('Payment process failed: ' . $e->getMessage());
                     }
                 }
 
-                // 🔔 إشعار للعميل في حالة الـ Cash إن الأوردر نجح ومستني التاجر
+                
                 \App\Models\notification::create([
                     'user_id' => $customer->user_id,
                     'message' => "Your order #{$order->id} has been placed successfully and is waiting for vendor approval.",
                     'type' => 'order',
                 ]);
 
-                // 🔔 إشعار للفيندور (التاجر) إن جاله أوردر جديد كاش ومحتاج يدخل يوافق عليه
+                
                 \App\Models\notification::create([
                     'user_id' => $vendor->user_id,
                     'message' => "You have received a new order #{$order->id}! Please review and accept it.",
@@ -220,7 +212,7 @@ class OrderController extends Controller
             ], 422);
 
         } catch (\Exception $e) {
-            // الـ 500 المقروءة والجميلة اللي بتشرح السبب لو الفيزا اترفضت أو الكود ضرب
+            
             return response()->json([
                 'status' => 'error',
                 'message' => 'Something went wrong while placing the order!',
@@ -233,30 +225,29 @@ class OrderController extends Controller
 
     public function updateStatus(Request $request, $id)
     {
-        // 1. الفاليجيشن بتاعك مع إضافة الحالات الجديدة
+        
         $request->validate([
             'status' => 'required|in:processing,completed,cancelled,delivered'
         ]);
 
-        $vendor = auth()->user()->vendor; // الفيندور اللي عامل login
+        $vendor = auth()->user()->vendor; 
 
-        // 2. نجيب الأوردر ونتأكد إنه يخص الفيندور ده (أمان)
+       
         $order = order::where('id', $id)
             ->where('vendor_id', $vendor->id)
             ->firstOrFail();
 
-        // 3. حماية أوردرات الفيزا (ممنوع البدء قبل الدفع)
+        
         if ($order->payment_method === 'card' && $order->order_status === 'pending' && $request->status === 'processing') {
             return response()->json(['message' => 'This order is not paid yet!'], 403);
         }
 
-        // 4. المنطق بتاعك (الفرق بين الاستلام والشحن)
+        
         if ($request->status === 'completed') {
-            // لو استلام من الفرع يبقى خلاص خلص، لو شحن يبقى "في الطريق"
+           
             $order->order_status = ($order->delivery_type === 'pickup') ? 'completed' : 'in_transit';
         } elseif ($request->status === 'delivered') {
-            // حالة الـ delivered بنستخدمها بس في الشحن (delivery)
-            // وبتحول حالة الأوردر لـ completed عشان يدخل في الأرباح
+            
             if ($order->delivery_type === 'delivery') {
                 $order->order_status = 'completed';
             } else {
@@ -264,7 +255,7 @@ class OrderController extends Controller
             }
 
         } elseif ($request->status === 'cancelled') {
-            // لو الأوردر اتكنسل، نرجع البضاعة للمخزن (الـ Logic بتاعك سليم)
+            
             foreach ($order->items as $item) {
                 $item->offer->restoreStock($item->quantity);
             }
@@ -276,7 +267,7 @@ class OrderController extends Controller
 
         $order->save();
 
-        // 5. إرسال الإشعار (مهم جداً لتجربة المستخدم)
+        
         $this->sendNotificationToCustomer($order);
 
         return response()->json([
@@ -285,7 +276,7 @@ class OrderController extends Controller
         ]);
     }
 
-    // فانكشن مساعدة للإشعارات عشان الكود يفضل نظيف
+    
     private function sendNotificationToCustomer($order)
     {
         $messages = [
@@ -311,7 +302,7 @@ class OrderController extends Controller
             'offer_id' => 'required|exists:offers,id',
         ]);
 
-        // سيبناها offer سمول زي ما هيّ في مشروعك
+        
         $offer = offer::with('branch')->findOrFail($request->offer_id);
         $branch = $offer->branch;
 

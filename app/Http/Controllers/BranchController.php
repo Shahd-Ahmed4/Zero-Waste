@@ -9,9 +9,8 @@ use Illuminate\Support\Facades\Auth;
 
 class BranchController extends Controller
 {
-    /**
-     * Helper: جيب الـ vendor أو ارجع 404
-     */
+    
+    
     private function getVendorOrFail()
     {
         $vendor = Auth::user()->vendor;
@@ -23,9 +22,7 @@ class BranchController extends Controller
         return $vendor;
     }
 
-    /**
-     * 1. عرض كل الفروع الخاصة بالتاجر الحالي
-     */
+    
     public function index()
     {
         $vendor = $this->getVendorOrFail();
@@ -37,9 +34,7 @@ class BranchController extends Controller
         ]);
     }
 
-    /**
-     * 2. إضافة فرع جديد
-     */
+    
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -63,15 +58,11 @@ class BranchController extends Controller
         ], 201);
     }
 
-    /**
-     * 3. عرض فرع معين بكل العروض الـ active اللي فيه
-     */
+   
     public function show($id)
     {
         $vendor = $this->getVendorOrFail();
 
-        // جلب الفرع مع عدد العروض والطلبات الإجمالي
-        // وجلب آخر 5 عروض وآخر 5 طلبات كـ Preview
         $branch = $vendor->branches()->withCount(['offers', 'orders'])->with([
             'offers' => function ($q) {
                 $q->where('status', 'active')
@@ -103,12 +94,12 @@ class BranchController extends Controller
 
         $query = $branch->orders();
 
-        // فلترة حسب الحالة (pending, completed, etc.)
+       
         if ($request->has('status')) {
             $query->where('status', $request->status);
         }
 
-        // فلترة حسب التاريخ (طلبات اليوم مثلاً)
+        
         if ($request->has('date')) {
             $query->whereDate('created_at', $request->date);
         }
@@ -146,15 +137,13 @@ class BranchController extends Controller
         ]);
     }
 
-    /**
-     * 5. مسح فرع (Delete)
-     */
+    
     public function destroy($id)
     {
         $vendor = $this->getVendorOrFail();
         $branch = $vendor->branches()->findOrFail($id);
 
-        // تنبيه: لو مسحتي الفرع، العروض اللي تحته هتتمسح لو عاملة Cascade Delete في الـ DB
+        
         $branch->delete();
 
         return response()->json([
@@ -163,9 +152,7 @@ class BranchController extends Controller
         ]);
     }
 
-    /**
-     * 6. البحث عن الفروع القريبة (Nearby Branches)
-     */
+    
     public function nearby(Request $request)
     {
         $request->validate([
@@ -195,7 +182,7 @@ class BranchController extends Controller
     }
     public function getBranchDetails($id)
     {
-        // بنجيب الفرع مع العروض بتاعته بس (الـ Global Scope هيجيب الـ active والـ quantity > 0 تلقائياً للعميل)
+        
         $branch = branch::with(['offers', 'vendor:id,business_name,logo'])->find($id);
 
         if (!$branch) {

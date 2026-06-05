@@ -11,9 +11,9 @@ use App\Models\order_item;
 
 class offer extends Model
 {
-    use SoftDeletes; // 2. استخدمي الخاصية دي جوه الكلاس
+    use SoftDeletes; 
 
-    // ... باقي الكود بتاعك (fillable, relations)
+    
     protected $fillable = [
         'branch_id',
         'title',
@@ -26,7 +26,7 @@ class offer extends Model
         'status',
     ];
     protected $hidden = ['created_at', 'updated_at'];
-    // السطر ده بيخلي الـ Average Rating يظهر في الـ API أوتوماتيك
+   
     protected $appends = ['average_rating', 'image_url', 'status'];
 
     protected $casts = [
@@ -36,12 +36,12 @@ class offer extends Model
     protected static function booted()
     {
         static::addGlobalScope('activeOffersForCustomers', function ($builder) {
-            // 🟢 السحر هنا: لو احنا في الـ Local Console أو اللي عامل Login تاجر أو أدمن، الـ Scope مش هيتدخل وهيقف ل تماماً
+            
             if (app()->runningInConsole() || (auth()->check() && (auth()->user()->vendor || auth()->user()->role === 'admin'))) {
                 return;
             }
 
-            // 🎯 الشروط دي هتتطبق بس على الزبائن والزوار (Real-time Filtering):
+            
             $builder->where('offers.status', 'active')
                 ->where('offers.quantity_available', '>', 0)
                 ->where(function ($query) {
@@ -53,9 +53,9 @@ class offer extends Model
 
     public function branch()
     {
-        return $this->belongsTo(branch::class); // كل Offer مرتبط بـ branch واحد
+        return $this->belongsTo(branch::class); 
     }
-    // تقدري برضه توصلي للـ Vendor صاحب العرض ده بسهولة
+    
     public function vendor()
     {
         return $this->branch ? $this->branch->vendor : null;
@@ -67,15 +67,15 @@ class offer extends Model
     }
     public function reduceStock($quantity)
     {
-        // التحقق قبل الخصم
+        
         if ($this->quantity_available < $quantity) {
             throw new \Exception("Insufficient stock for offer: {$this->title}");
         }
 
-        // خصم الكمية من الداتابيز مباشرة
+        
         $this->decrement('quantity_available', $quantity);
 
-        // تحديث نسخة الموديل في الذاكرة لتكون مطابقة للداتابيز
+        
         $this->refresh();
 
         return true;
@@ -83,10 +83,10 @@ class offer extends Model
 
     public function restoreStock($quantity)
     {
-        // زيادة الكمية في الداتابيز
+       
         $this->increment('quantity_available', $quantity);
 
-        // تحديث نسخة الموديل
+        
         $this->refresh();
     }
     public function reviews()
@@ -94,32 +94,32 @@ class offer extends Model
         return $this->hasMany(review::class, 'offer_id');
     }
 
-    // الـ Accessor اللي بيحسب النجوم (⭐)
+    
     public function getAverageRatingAttribute()
     {
-        // لو الكنترولر حاسب الـ Avg مسبقاً في كويري واحد مجمع، بنستخدمه فوراً ونوفر وقت
+        
         if (array_key_exists('reviews_avg_rating', $this->attributes)) {
             return round($this->attributes['reviews_avg_rating'] ?: 0, 1);
         }
 
-        // لو الـ Controller محسبهاش (زي صفحة الـ Show لتفاصيل عرض واحد)، بيحسبها عادي من الداتابيز
+        
         return round($this->reviews()->avg('rating') ?: 0, 1);
     }
     public function getImageUrlAttribute()
     {
-        // 1. لو الصورة فاضية، رجعي الافتراضي
+        
         if (!$this->image) {
             return asset('images/default-placeholder.png');
         }
 
-        // 2. لو الرابط كامل (مثال: صورة جاية من API خارجي)
+        
         if (filter_var($this->image, FILTER_VALIDATE_URL)) {
             return $this->image;
         }
 
-        // 3. لو الصورة من الـ Seeder الأساسي (موجودة في public/uploads مباشرة)
+       
         if (str_starts_with($this->image, 'uploads/')) {
-            return url($this->image); // بدل asset()
+            return url($this->image); 
         }
 
         return asset('storage/' . $this->image);

@@ -11,35 +11,33 @@ use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 
 class OfferController extends Controller
 {
-    /**
-     * 1. عرض العروض (العملاء والأدمن)
-     */
+    
     public function index(Request $request)
     {
         try {
             $user = auth('sanctum')->user();
 
-            // 1. نبدأ بـ Query أساسي ونحدد صراحة أننا نريد معرف العرض أولاً لتجنب تضارب الجداول
+            
             $query = offer::query()->select('offers.id', 'offers.title', 'offers.description', 'offers.image','offers.quantity_available', 'offers.original_price', 'offers.discount_price', 'offers.expiration_time', 'offers.status', 'offers.branch_id', 'offers.created_at')
                 ->withAvg('reviews', 'rating')
                 ->with([
                     'branch' => function ($q) {
-                        // نضمن دائماً وضع الـ id والـ vendor_id لتنجح العلاقة
+                        
                         $q->select('id', 'branch_name', 'store_address', 'lat', 'long', 'vendor_id');
                     },
                     'branch.vendor:id,business_name,logo'
                 ]);
 
-            // 2. تصفية للأدمن vs المستخدم العادي
+           
             if ($user && $user->role === 'admin') {
-                // الأدمن يشوف كله
+               
             } else {
                 $query->where('offers.status', 'active')
-                    ->where('quantity_available', '>', 0) // <-- ده السطر اللي ضفناه للكمية
+                    ->where('quantity_available', '>', 0) 
                     ->where('expiration_time', '>', now());
             }
 
-            // 3. فلتر نوع الفيندور
+            
             if ($request->filled('vendor_type') && $request->vendor_type !== 'all') {
                 $allowedTypes = ['restaurant', 'bakery', 'cafe', 'supermarket', 'hotel', 'others'];
 
@@ -50,7 +48,7 @@ class OfferController extends Controller
                 }
             }
 
-            // 4. منطق الترتيب (Sorting) - الدمج الصحيح والآمن هنا
+           
             if ($request->filled('sort_by')) {
                 switch ($request->sort_by) {
                     case 'distance':
@@ -73,7 +71,7 @@ class OfferController extends Controller
                             ->orderBy('discount_amount', 'desc');
                         break;
 
-                    // 🌟 لو بعت sort_by مش معروفة، بنشغل الترتيب الذكي كـ خيار احتياطي
+                    
                     default:
                         if ($request->filled('lat') && $request->filled('long')) {
                             $lat = $request->lat;
@@ -90,9 +88,9 @@ class OfferController extends Controller
                         break;
                 }
             } else {
-                // 🌟 الترتيب التلقائي الذكي أول ما يفتح الصفحة (بدون sort_by) 🌟
+               
                 if ($request->filled('lat') && $request->filled('long')) {
-                    // 1️⃣ الحالة الأولى: لو مدخل اللوكيشن -> يرتب بالأقرب مسافة ثم الأقرب انتهاءً
+                    
                     $lat = $request->lat;
                     $lon = $request->long;
 
@@ -102,7 +100,7 @@ class OfferController extends Controller
                         ->orderBy('distance', 'asc')
                         ->orderBy('minutes_left', 'asc');
                 } else {
-                    // 2️⃣ الحالة الثانية: لو مش مدخل لوكيشن -> يرتب بناءً على الوقت (المنتهي قريباً أولاً)
+                    
                     $query->orderBy('offers.expiration_time', 'asc');
                 }
             }
@@ -112,7 +110,7 @@ class OfferController extends Controller
                 if (isset($offer->reviews_avg_rating)) {
                     $offer->average_rating = round($offer->reviews_avg_rating ?: 0, 1);
                 } else {
-                    // 🟡 احتياطي لو لارافيل خزنها في العلاقة مباشرة
+                   
                     $offer->average_rating = round($offer->reviews()->avg('rating') ?: 0, 1);
                 }
                 return $offer;
@@ -135,7 +133,7 @@ class OfferController extends Controller
     {
         $user = auth('sanctum')->user();
 
-        // 1️⃣ لو المستخدم مش عامل Login (ضيف مثلاً)، هنرجعله العروض العادية حسب الوقت لعدم وجود تاريخ شرائي
+        
         if (!$user) {
             $fallbackOffers = offer::where('status', 'active')
                 ->where('expiration_time', '>', now())
@@ -150,20 +148,19 @@ class OfferController extends Controller
         }
 
         try {
-            // 2️⃣ السحر الأول: نكتشف "ذوق مصلحة الزبون" بناءً على تاريخ أوردراته السابقة
-            // بنعمل Join بين الأوردرات، العروض، الفروع، وجدول الفيندورز عشان نعرف الـ vendor_type المفضل
+            
             $userPreference = order::where('orders.user_id', $user->id)
                 ->join('offers', 'orders.offer_id', '=', 'offers.id')
                 ->join('branches', 'offers.branch_id', '=', 'branches.id')
                 ->join('vendors', 'branches.vendor_id', '=', 'vendors.id')
                 ->select('vendors.vendor_type', \DB::raw('COUNT(*) as order_count'))
                 ->groupBy('vendors.vendor_type')
-                ->orderBy('order_count', 'desc') // الأعلى شراءً في الصدارة
-                ->first(); // بناخد التايب رقم 1 المفضل عنده
+                ->orderBy('order_count', 'desc') 
+                ->first(); 
 
             $favoriteType = $userPreference ? $userPreference->vendor_type : null;
 
-            // 3️⃣ بناء الاستعلام الأساسي لعروض الأبلكيشن النشطة حالياً
+            
             $query = offer::query()->select('offers.id', 'offers.title', 'offers.description', 'offers.image', 'offers.original_price', 'offers.discount_price', 'offers.expiration_time', 'offers.status', 'offers.branch_id', 'offers.created_at')
                 ->with([
                     'branch:id,branch_name,store_address,lat,long,vendor_id',
@@ -172,30 +169,27 @@ class OfferController extends Controller
                 ->where('offers.status', 'active')
                 ->where('expiration_time', '>', now());
 
-            // 4️⃣ السحر الثاني: دمج "الموقع" مع "ذوق الزبون الشرائي" في الترتيب (Scoring)
+            
             if ($request->filled('lat') && $request->filled('long')) {
                 $lat = $request->lat;
                 $lon = $request->long;
 
-                // بنربط الجداول عشان نحسب المسافة ونعرف نوع المحل لكل عرض
+                
                 $query->join('branches', 'offers.branch_id', '=', 'branches.id')
                     ->join('vendors', 'branches.vendor_id', '=', 'vendors.id');
 
-                // حساب المسافة الجغرافية بالكيلومتر (Haversine Formula)
+                
                 $distanceSql = "(6371 * acos(cos(radians($lat)) * cos(radians(branches.lat)) * cos(radians(branches.long) - radians($lon)) + sin(radians($lat)) * sin(radians(branches.lat))))";
                 $query->addSelect(\DB::raw("$distanceSql AS distance"));
 
-                // حساب الـ Score الذكي:
-                // لو نوع الفيندور بتاع العرض هو نفس الـ favoriteType اللي الزبون بيحبه دايماً، العرض ياخد +15 نقطة فوراً!
-                // ونطرح منه المسافة عشان العروض الأقرب تاخد نقاط أعلى برضه
+                
                 $favoriteTypeCondition = $favoriteType ? "'$favoriteType'" : "'none'";
                 $scoreSql = "CASE WHEN vendors.vendor_type = $favoriteTypeCondition THEN 15 ELSE 0 END - ($distanceSql * 1.5)";
 
                 $query->addSelect(\DB::raw("($scoreSql) AS recommendation_score"))
-                    ->orderBy('recommendation_score', 'desc'); // الترتيب من الأعلى سكور للأقل
+                    ->orderBy('recommendation_score', 'desc'); 
 
             } else {
-                // 5️⃣ لو قافل الـ GPS أو قاعدين في مكان مجهول، هنرتب بناءً على ذوقه الشرائي دايماً ثم قرب انتهاء الوقت
                 if ($favoriteType) {
                     $query->join('branches', 'offers.branch_id', '=', 'branches.id')
                         ->join('vendors', 'branches.vendor_id', '=', 'vendors.id')
@@ -206,7 +200,7 @@ class OfferController extends Controller
                 }
             }
 
-            // جلب أعلى 10 عروض مخصصة وذكية بالملّي للزبون ده
+           
             $recommendedOffers = $query->take(10)->get();
 
             return response()->json([
@@ -217,7 +211,7 @@ class OfferController extends Controller
             ]);
 
         } catch (Exception $e) {
-            // خطة بديلة (Fallback) عشان الـ App ميموتش لو حصل أي غلطة في حسابات الـ SQL المعقدة
+            
             return response()->json([
                 'status' => 'success',
                 'data' => offer::where('status', 'active')->where('expiration_time', '>', now())->latest()->take(10)->get(),
@@ -226,13 +220,11 @@ class OfferController extends Controller
         }
     }
 
-    /**
-     * 2. إضافة عرض جديد (مربوط بفرع)
-     */
+   
     public function store(Request $request)
     {
         try {
-            // 1. عمل الـ Validation
+            
             $data = $request->validate([
                 'branch_id' => 'required|exists:branches,id',
                 'title' => 'required|string',
@@ -246,7 +238,6 @@ class OfferController extends Controller
 
             $vendor = Auth::user()->vendor;
 
-            // 2. التأكد إن الفرع يخص التاجر ده
             $branch = $vendor->branches()->find($request->branch_id);
 
             if (!$branch) {
@@ -256,23 +247,22 @@ class OfferController extends Controller
                 ], 403);
             }
 
-            // 3. رفع الصورة
-            // 3. رفع الصورة إلى Cloudinary
+            
             if ($request->hasFile('image')) {
                 $file = $request->file('image');
                 $imageName = time() . '_' . $file->getClientOriginalName();
                 $file->move(public_path('uploads'), $imageName);
                 $data['image'] = 'uploads/' . $imageName;
             }
-            // Add this right before: $offer = $branch->offers()->create($data);
+          
             if (isset($data['expiration_time'])) {
                 $data['expiration_time'] = date('Y-m-d H:i:s', strtotime($data['expiration_time']));
             }
 
-            // 4. إنشاء العرض تحت الفرع
+           
             $offer = $branch->offers()->create($data);
 
-            // 5. تنبيه العملاء (Notification)
+           
             $customers = \App\Models\customer::all();
             foreach ($customers as $customer) {
                 \App\Models\notification::create([
@@ -283,8 +273,7 @@ class OfferController extends Controller
                 ]);
             }
 
-            // تحضير رابط الصورة النهائي في الـ Response
-            // تحضير رابط الصورة النهائي في الـ Response
+          
             if ($offer->image) {
                 $offer->image = url($offer->image);
             }
@@ -296,27 +285,25 @@ class OfferController extends Controller
             ], 201);
 
         } catch (\Illuminate\Validation\ValidationException $e) {
-            // 🟢 لو المشكلة في الـ Validation (بيانات ناقصة أو غلط)، هيرجع الـ Errors بالملي للفرونت إند
+           
             return response()->json([
                 'status' => 'error',
                 'message' => 'Validation Failed!',
-                'errors' => $e->errors() // هيرجع لستة بكل الحقول اللي مسببة الـ 422
+                'errors' => $e->errors() 
             ], 422);
 
         } catch (\Exception $e) {
-            // 🔴 لو حصل أي خطأ تاني غير متوقع (مشكلة داتابيز، سيرفر، إلخ)
+            
             return response()->json([
                 'status' => 'error',
                 'message' => 'Something went wrong on the server!',
-                'error_debug' => $e->getMessage(), // السطر السحري اللي هيطبعلهم نص الخطأ الفعلي
-                'line' => $e->getLine() // هيقولهم رقم السطر اللي ضارب في الكود عندك
+                'error_debug' => $e->getMessage(), 
+                'line' => $e->getLine() 
             ], 500);
         }
     }
 
-    /**
-     * 3. التاجر يشوف عروضه (من كل الفروع)
-     */
+   
     public function myOffers()
     {
         $vendor = Auth::user()->vendor;

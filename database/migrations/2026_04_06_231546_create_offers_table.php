@@ -22,7 +22,7 @@ return new class extends Migration
             $table->decimal('discount_price',10,2);
             $table->timestamp('expiration_time');
             $table->enum('status', ['active', 'expired', 'disabled'])->default('active');
-            $table->softDeletes(); // ده بيضيف عمود deleted_at
+            $table->softDeletes(); 
             $table->timestamps();
         });
     }

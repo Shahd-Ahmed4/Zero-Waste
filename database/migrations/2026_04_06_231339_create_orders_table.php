@@ -23,7 +23,7 @@ return new class extends Migration {
             $table->decimal('total_amount', 10, 2);
             $table->enum('payment_method', ['card', 'cash']);
             $table->timestamp('order_date')->useCurrent();
-            $table->timestamps(); //ya aktfy b de ya ashelha we ahot el order date
+            $table->timestamps(); 
         });
     }
 
