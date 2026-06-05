@@ -18,6 +18,7 @@ use App\Http\Controllers\VendorController;
 use App\Http\Controllers\VendorDashboardController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Models\User;
 
 
 
@@ -42,12 +43,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('vendor/myprofile/update', [VendorController::class, 'update']);
         Route::put('/vendor/change-password', [VendorController::class, 'changePassword']);
         Route::delete('/vendor/delete-account', [VendorController::class, 'destroy']);
-        Route::get('vendor/myoffers', [OfferController::class, 'myOffers']); 
-        Route::get('vendor/offers/{id}', [OfferController::class, 'showVendorOffer']); 
-        Route::post('/vendor/offers', [OfferController::class, 'store']);      
-        Route::put('/vendor/offers/{id}', [OfferController::class, 'update']); 
-        Route::patch('vendor/offers/{id}/status/', [OfferController::class, 'updateStatus']); 
-        Route::delete('/vendor/offers/{id}', [OfferController::class, 'destroy']); 
+        Route::get('vendor/myoffers', [OfferController::class, 'myOffers']);
+        Route::get('vendor/offers/{id}', [OfferController::class, 'showVendorOffer']);
+        Route::post('/vendor/offers', [OfferController::class, 'store']);
+        Route::put('/vendor/offers/{id}', [OfferController::class, 'update']);
+        Route::patch('vendor/offers/{id}/status/', [OfferController::class, 'updateStatus']);
+        Route::delete('/vendor/offers/{id}', [OfferController::class, 'destroy']);
         Route::get('/vendor/orders', [VendorController::class, 'getOrdersForMe']);
         Route::patch('/vendor/orders/{id}/status', [OrderController::class, 'updateStatus']);
         Route::get('/vendor/branches', [VendorDashboardController::class, 'getVendorBranches']);
@@ -60,12 +61,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/vendor/dashboard/sales/{id}', [VendorDashboardController::class, 'showSoldItem']);
         Route::get('/vendor/reviews', [VendorController::class, 'offerReviews']);
         Route::get('/vendor/offers/{offer_id}/reviews', [VendorController::class, 'showOfferReviews']);
-        Route::get('/my-branches', [BranchController::class, 'index']);      
-        Route::post('/branches', [BranchController::class, 'store']);        
-        Route::get('/branches/{id}', [BranchController::class, 'show']);     
-        Route::put('/branches/{id}', [BranchController::class, 'update']);   
-        Route::delete('/branches/{id}', [BranchController::class, 'destroy']); 
-        Route::get('/branches/{id}/all-orders', [BranchController::class, 'allOrders']); 
+        Route::get('/my-branches', [BranchController::class, 'index']);
+        Route::post('/branches', [BranchController::class, 'store']);
+        Route::get('/branches/{id}', [BranchController::class, 'show']);
+        Route::put('/branches/{id}', [BranchController::class, 'update']);
+        Route::delete('/branches/{id}', [BranchController::class, 'destroy']);
+        Route::get('/branches/{id}/all-orders', [BranchController::class, 'allOrders']);
         Route::get('/vendor/sustainability/metrics', [SustainabilityController::class, 'getVendorMetrics']);
 
 
@@ -87,20 +88,39 @@ Route::middleware(['auth:sanctum', 'checkadmin'])->group(function () {
     Route::middleware(['checkadmin:super_admin,manager'])->group(function () {
         Route::put('/profile', [AdminController::class, 'updateProfile']);
         Route::put('/admin/change-password', [AdminController::class, 'changePassword']);
-        Route::get('/admin/vendor/pending', [AdminController::class, 'pendingVendors']);  
-        Route::get('/admin/vendor/{id}', [AdminController::class, 'showPendingDocs']); 
-        Route::post('/admin/vendor/{id}/accept', [AdminController::class, 'accept']);  
-        Route::post('/admin/vendor/{id}/reject', [AdminController::class, 'reject']);  
+        Route::get('/admin/vendor/pending', [AdminController::class, 'pendingVendors']);
+        Route::get('/admin/vendor/{id}', [AdminController::class, 'showPendingDocs']);
+        Route::post('/admin/vendor/{id}/accept', [AdminController::class, 'accept']);
+        Route::post('/admin/vendor/{id}/reject', [AdminController::class, 'reject']);
         Route::patch('/admin/users/{id}/block', [AdminController::class, 'blockUser']);
         Route::patch('/admin/users/{id}/unblock', [AdminController::class, 'unblockUser']);
         Route::get('/admin/reviews', [AdminController::class, 'listAllReviews']);
         Route::patch('/reviews/{id}/toggle-visibility', [AdminController::class, 'toggleVisibility']);
+        Route::get('/admin/vendors/stats', function () {
+            // Group by status للـ vendors فقط
+            $groupedByStatus = User::where('role', 'vendor')
+                ->selectRaw('status, COUNT(*) as count')
+                ->groupBy('status')
+                ->pluck('count', 'status');
+
+            // تأكد إن كل الـ statuses موجودة حتى لو count = 0
+            $statuses = ['active', 'pending', 'rejected', 'blocked'];
+            $result = [];
+            foreach ($statuses as $status) {
+                $result[$status] = $groupedByStatus[$status] ?? 0;
+            }
+
+            return response()->json([
+                'total_vendors' => array_sum($result),
+                'by_status' => $result,
+            ]);
+        });
 
         Route::middleware(['checkadmin:super_admin'])->group(function () {
             Route::delete('/admin/customers/{id}', [AdminController::class, 'destroy']);
             Route::delete('/admin/offers/{id}', [AdminController::class, 'deleteOfferByAdmin']);
             Route::delete('/profile', [AdminController::class, 'deleteAccount']);
-            Route::delete('/admin/vendor/{id}', [AdminController::class, 'destroyVendor']); 
+            Route::delete('/admin/vendor/{id}', [AdminController::class, 'destroyVendor']);
             Route::delete('/admin/customers/{id}', [AdminController::class, 'delete']);
         });
     });
@@ -118,14 +138,14 @@ Route::middleware(['auth:sanctum', 'checkcustomer'])->group(function () {
     Route::put('/customer/profile', [CustomerController::class, 'update']);
     Route::put('/profile/change-password', [CustomerController::class, 'changePassword']);
     Route::delete('customer/delete-profile', [CustomerController::class, 'destroy']);
-    Route::post('/orders', [OrderController::class, 'store']);  
+    Route::post('/orders', [OrderController::class, 'store']);
     Route::post('/orders/calculate-fee', [OrderController::class, 'calculateFee']);
-    Route::get('/my-orders', [OrderController::class, 'index']); 
-    
+    Route::get('/my-orders', [OrderController::class, 'index']);
+
     Route::get('/orders/{id}', [OrderController::class, 'show']);
     Route::post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
     Route::post('/reviews', [ReviewController::class, 'store']);
-    Route::get('/my-reviews', [ReviewController::class, 'myReviews']); 
+    Route::get('/my-reviews', [ReviewController::class, 'myReviews']);
     Route::delete('/reviews/{id}', [ReviewController::class, 'destroy']);
     Route::post('/favorites/toggle', [FavoriteController::class, 'toggleFavorite']);
     Route::get('/favorites', [FavoriteController::class, 'getFavorites']);
@@ -142,10 +162,10 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/verify-reset-code', [AuthController::class, 'verifyCode']);
 Route::post('/reset-password', [AuthController::class, 'resetPassword']);
-Route::get('/vendors', [VendorController::class, 'index']);  
-Route::get('/branches/nearby', [BranchController::class, 'nearby']); 
-Route::get('/vendors/search', [VendorController::class, 'index']); 
-Route::get('/vendor/{id}', [VendorController::class, 'show']); 
+Route::get('/vendors', [VendorController::class, 'index']);
+Route::get('/branches/nearby', [BranchController::class, 'nearby']);
+Route::get('/vendors/search', [VendorController::class, 'index']);
+Route::get('/vendor/{id}', [VendorController::class, 'show']);
 Route::get('/offers', [OfferController::class, 'index']);
 Route::get('/offers/{id}', [OfferController::class, 'show']);
 Route::get('/offers/{offer_id}/reviews', [ReviewController::class, 'index']);
