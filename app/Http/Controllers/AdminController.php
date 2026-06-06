@@ -68,7 +68,7 @@ class AdminController extends Controller
             });
         }
 
-        $vendors = $query->latest()->get();
+        $vendors = $query->latest()->paginate(10);
 
         if ($vendors->isEmpty()) {
             return response()->json([
