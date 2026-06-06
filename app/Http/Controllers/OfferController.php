@@ -11,16 +11,16 @@ use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 
 class OfferController extends Controller
 {
-    
+
     public function index(Request $request)
     {
         try {
             $user = auth('sanctum')->user();
-            $query = offer::query()->select('offers.id', 'offers.title', 'offers.description', 'offers.image','offers.quantity_available', 'offers.original_price', 'offers.discount_price', 'offers.expiration_time', 'offers.status', 'offers.branch_id', 'offers.created_at')
+            $query = offer::query()->select('offers.id', 'offers.title', 'offers.description', 'offers.image', 'offers.quantity_available', 'offers.original_price', 'offers.discount_price', 'offers.expiration_time', 'offers.status', 'offers.branch_id', 'offers.created_at')
                 ->withAvg('reviews', 'rating')
                 ->with([
                     'branch' => function ($q) {
-                        
+
                         $q->select('id', 'branch_name', 'store_address', 'lat', 'long', 'vendor_id');
                     },
                     'branch.vendor:id,business_name,logo'
@@ -28,7 +28,7 @@ class OfferController extends Controller
             if ($user && $user->role === 'admin') {
             } else {
                 $query->where('offers.status', 'active')
-                    ->where('quantity_available', '>', 0) 
+                    ->where('quantity_available', '>', 0)
                     ->where('expiration_time', '>', now());
             }
             if ($request->filled('vendor_type') && $request->vendor_type !== 'all') {
@@ -90,7 +90,7 @@ class OfferController extends Controller
                 if (isset($offer->reviews_avg_rating)) {
                     $offer->average_rating = round($offer->reviews_avg_rating ?: 0, 1);
                 } else {
-                   
+
                     $offer->average_rating = round($offer->reviews()->avg('rating') ?: 0, 1);
                 }
                 return $offer;
@@ -110,67 +110,137 @@ class OfferController extends Controller
     public function getSmartRecommendations(Request $request)
     {
         $user = auth('sanctum')->user();
+
         if (!$user) {
             $fallbackOffers = offer::where('status', 'active')
                 ->where('expiration_time', '>', now())
                 ->orderBy('expiration_time', 'asc')
                 ->take(10)
                 ->get();
+
             return response()->json([
                 'status' => 'success',
                 'data' => $fallbackOffers
             ]);
         }
+
         try {
+            // ── 1. Get user's favorite vendor_type (frequency + recency weighted) ──
             $userPreference = order::where('orders.user_id', $user->id)
                 ->join('offers', 'orders.offer_id', '=', 'offers.id')
                 ->join('branches', 'offers.branch_id', '=', 'branches.id')
                 ->join('vendors', 'branches.vendor_id', '=', 'vendors.id')
-                ->select('vendors.vendor_type', \DB::raw('COUNT(*) as order_count'))
+                ->select(
+                    'vendors.vendor_type',
+                    \DB::raw('COUNT(*) as order_count'),
+                    \DB::raw('MAX(orders.created_at) as last_ordered_at'),
+                    \DB::raw('DATEDIFF(NOW(), MAX(orders.created_at)) as days_since_last_order')
+                )
                 ->groupBy('vendors.vendor_type')
-                ->orderBy('order_count', 'desc') 
-                ->first(); 
-            $favoriteType = $userPreference ? $userPreference->vendor_type : null;
-            $query = offer::query()->select('offers.id', 'offers.title', 'offers.description', 'offers.image', 'offers.original_price', 'offers.discount_price', 'offers.expiration_time', 'offers.status', 'offers.branch_id', 'offers.created_at')
+                ->orderByRaw('COUNT(*) DESC, MAX(orders.created_at) DESC')
+                ->first();
+
+            $favoriteType = $userPreference?->vendor_type;
+            $daysSinceLastOrder = $userPreference?->days_since_last_order ?? 9999;
+
+            // ── 2. Get vendor IDs the user has ordered from before (for "ordered before" boost) ──
+            $previousVendorIds = order::where('orders.user_id', $user->id)
+                ->join('offers', 'orders.offer_id', '=', 'offers.id')
+                ->join('branches', 'offers.branch_id', '=', 'branches.id')
+                ->pluck('branches.vendor_id')
+                ->unique()
+                ->values()
+                ->toArray();
+
+            // ── 3. Build base query (always JOIN branches + vendors for consistent SQL) ──
+            $query = offer::query()
+                ->select(
+                    'offers.id',
+                    'offers.title',
+                    'offers.description',
+                    'offers.image',
+                    'offers.original_price',
+                    'offers.discount_price',
+                    'offers.expiration_time',
+                    'offers.status',
+                    'offers.branch_id',
+                    'offers.created_at'
+                )
+                ->join('branches', 'offers.branch_id', '=', 'branches.id')
+                ->join('vendors', 'branches.vendor_id', '=', 'vendors.id')
                 ->with([
                     'branch:id,branch_name,store_address,lat,long,vendor_id',
                     'branch.vendor:id,business_name,logo,vendor_type'
                 ])
                 ->where('offers.status', 'active')
-                ->where('expiration_time', '>', now());
+                ->where('offers.expiration_time', '>', now());
+
+            // ── 4. Build personalized score SQL ──
+            $favTypeBinding = $favoriteType ?? '__none__';
+            $recencyScore = $daysSinceLastOrder < 9999
+                ? "GREATEST(0, (20 - (DATEDIFF(NOW(), '" . now()->subDays($daysSinceLastOrder)->toDateTimeString() . "') / 30.0) * 20))"
+                : "0";
+
+            $prevVendorList = empty($previousVendorIds)
+                ? 'NULL'
+                : implode(',', array_map('intval', $previousVendorIds));
+
             if ($request->filled('lat') && $request->filled('long')) {
-                $lat = $request->lat;
-                $lon = $request->long;
-                $query->join('branches', 'offers.branch_id', '=', 'branches.id')
-                    ->join('vendors', 'branches.vendor_id', '=', 'vendors.id');
-                $distanceSql = "(6371 * acos(cos(radians($lat)) * cos(radians(branches.lat)) * cos(radians(branches.long) - radians($lon)) + sin(radians($lat)) * sin(radians(branches.lat))))";
-                $query->addSelect(\DB::raw("$distanceSql AS distance"));
-                $favoriteTypeCondition = $favoriteType ? "'$favoriteType'" : "'none'";
-                $scoreSql = "CASE WHEN vendors.vendor_type = $favoriteTypeCondition THEN 15 ELSE 0 END - ($distanceSql * 1.5)";
+                $lat = (float) $request->lat;
+                $lon = (float) $request->long;
+
+                $distanceSql = "(6371 * acos(
+                cos(radians(?)) * cos(radians(branches.lat))
+                * cos(radians(branches.long) - radians(?))
+                + sin(radians(?)) * sin(radians(branches.lat))
+            ))";
+
+                $query->addSelect(\DB::raw("$distanceSql AS distance"))
+                    ->addBinding([$lat, $lon, $lat], 'select');
+
+                $scoreSql = "
+                (CASE WHEN vendors.vendor_type = ? THEN 15 ELSE 0 END)
+                + ({$recencyScore})
+                + (CASE WHEN vendors.id IN ({$prevVendorList}) THEN 10 ELSE 0 END)
+                - (($distanceSql) * 1.5)
+            ";
+
                 $query->addSelect(\DB::raw("($scoreSql) AS recommendation_score"))
-                    ->orderBy('recommendation_score', 'desc'); 
+                    ->addBinding([$favTypeBinding, $lat, $lon, $lat], 'select')
+                    ->orderBy('recommendation_score', 'desc');
+
             } else {
-                if ($favoriteType) {
-                    $query->join('branches', 'offers.branch_id', '=', 'branches.id')
-                        ->join('vendors', 'branches.vendor_id', '=', 'vendors.id')
-                        ->orderByRaw("CASE WHEN vendors.vendor_type = '$favoriteType' THEN 0 ELSE 1 END")
-                        ->orderBy('offers.expiration_time', 'asc');
-                } else {
-                    $query->orderBy('offers.expiration_time', 'asc');
-                }
+                // No location — score without distance component
+                $scoreSql = "
+                (CASE WHEN vendors.vendor_type = ? THEN 15 ELSE 0 END)
+                + ({$recencyScore})
+                + (CASE WHEN vendors.id IN ({$prevVendorList}) THEN 10 ELSE 0 END)
+            ";
+
+                $query->addSelect(\DB::raw("($scoreSql) AS recommendation_score"))
+                    ->addBinding([$favTypeBinding], 'select')
+                    ->orderBy('recommendation_score', 'desc')
+                    ->orderBy('offers.expiration_time', 'asc'); // tiebreaker
             }
+
             $recommendedOffers = $query->take(10)->get();
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Smart personalized recommendations fetched successfully',
                 'detected_favorite_category' => $favoriteType ?? 'No history yet (New User)',
                 'data' => $recommendedOffers
             ]);
-        } catch (Exception $e) {
+
+        } catch (\Exception $e) {
             return response()->json([
                 'status' => 'success',
-                'data' => offer::where('status', 'active')->where('expiration_time', '>', now())->latest()->take(10)->get(),
-                'debug_error' => $e->getMessage()
+                'data' => offer::where('status', 'active')
+                    ->where('expiration_time', '>', now())
+                    ->latest()
+                    ->take(10)
+                    ->get(),
+                'debug_error' => app()->environment('local') ? $e->getMessage() : null
             ]);
         }
     }
@@ -226,14 +296,14 @@ class OfferController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Validation Failed!',
-                'errors' => $e->errors() 
+                'errors' => $e->errors()
             ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Something went wrong on the server!',
-                'error_debug' => $e->getMessage(), 
-                'line' => $e->getLine() 
+                'error_debug' => $e->getMessage(),
+                'line' => $e->getLine()
             ], 500);
         }
     }
