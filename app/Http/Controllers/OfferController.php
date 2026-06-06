@@ -16,8 +16,6 @@ class OfferController extends Controller
     {
         try {
             $user = auth('sanctum')->user();
-
-            
             $query = offer::query()->select('offers.id', 'offers.title', 'offers.description', 'offers.image','offers.quantity_available', 'offers.original_price', 'offers.discount_price', 'offers.expiration_time', 'offers.status', 'offers.branch_id', 'offers.created_at')
                 ->withAvg('reviews', 'rating')
                 ->with([
@@ -27,41 +25,31 @@ class OfferController extends Controller
                     },
                     'branch.vendor:id,business_name,logo'
                 ]);
-
-           
             if ($user && $user->role === 'admin') {
-               
             } else {
                 $query->where('offers.status', 'active')
                     ->where('quantity_available', '>', 0) 
                     ->where('expiration_time', '>', now());
             }
-
-            
             if ($request->filled('vendor_type') && $request->vendor_type !== 'all') {
                 $allowedTypes = ['restaurant', 'bakery', 'cafe', 'supermarket', 'hotel', 'others'];
-
                 if (in_array(strtolower($request->vendor_type), $allowedTypes)) {
                     $query->whereHas('branch.vendor', function ($q) use ($request) {
                         $q->where('vendor_type', strtolower($request->vendor_type));
                     });
                 }
             }
-
-           
             if ($request->filled('sort_by')) {
                 switch ($request->sort_by) {
                     case 'distance':
                         if ($request->filled('lat') && $request->filled('long')) {
                             $lat = $request->lat;
                             $lon = $request->long;
-
                             $query->join('branches', 'offers.branch_id', '=', 'branches.id')
                                 ->addSelect(\DB::raw("(6371 * acos(cos(radians($lat)) * cos(radians(branches.lat)) * cos(radians(branches.long) - radians($lon)) + sin(radians($lat)) * sin(radians(branches.lat)))) AS distance"))
                                 ->orderBy('distance', 'asc');
                         }
                         break;
-
                     case 'rating':
                         $query->orderBy('reviews_avg_rating', 'desc');
                         break;
@@ -70,13 +58,10 @@ class OfferController extends Controller
                         $query->addSelect(\DB::raw('(original_price - discount_price) as discount_amount'))
                             ->orderBy('discount_amount', 'desc');
                         break;
-
-                    
                     default:
                         if ($request->filled('lat') && $request->filled('long')) {
                             $lat = $request->lat;
                             $lon = $request->long;
-
                             $query->join('branches', 'offers.branch_id', '=', 'branches.id')
                                 ->addSelect(\DB::raw("(6371 * acos(cos(radians($lat)) * cos(radians(branches.lat)) * cos(radians(branches.long) - radians($lon)) + sin(radians($lat)) * sin(radians(branches.lat)))) AS distance"))
                                 ->addSelect(\DB::raw("TIMESTAMPDIFF(MINUTE, NOW(), offers.expiration_time) AS minutes_left"))
@@ -88,23 +73,18 @@ class OfferController extends Controller
                         break;
                 }
             } else {
-               
                 if ($request->filled('lat') && $request->filled('long')) {
-                    
                     $lat = $request->lat;
                     $lon = $request->long;
-
                     $query->join('branches', 'offers.branch_id', '=', 'branches.id')
                         ->addSelect(\DB::raw("(6371 * acos(cos(radians($lat)) * cos(radians(branches.lat)) * cos(radians(branches.long) - radians($lon)) + sin(radians($lat)) * sin(radians(branches.lat)))) AS distance"))
                         ->addSelect(\DB::raw("TIMESTAMPDIFF(MINUTE, NOW(), offers.expiration_time) AS minutes_left"))
                         ->orderBy('distance', 'asc')
                         ->orderBy('minutes_left', 'asc');
                 } else {
-                    
                     $query->orderBy('offers.expiration_time', 'asc');
                 }
             }
-
             $data = $query->get();
             $data->transform(function ($offer) {
                 if (isset($offer->reviews_avg_rating)) {
@@ -115,7 +95,6 @@ class OfferController extends Controller
                 }
                 return $offer;
             });
-
             return response()->json([
                 'status' => 'success',
                 'data' => $data
@@ -128,27 +107,21 @@ class OfferController extends Controller
             ], 500);
         }
     }
-
     public function getSmartRecommendations(Request $request)
     {
         $user = auth('sanctum')->user();
-
-        
         if (!$user) {
             $fallbackOffers = offer::where('status', 'active')
                 ->where('expiration_time', '>', now())
                 ->orderBy('expiration_time', 'asc')
                 ->take(10)
                 ->get();
-
             return response()->json([
                 'status' => 'success',
                 'data' => $fallbackOffers
             ]);
         }
-
         try {
-            
             $userPreference = order::where('orders.user_id', $user->id)
                 ->join('offers', 'orders.offer_id', '=', 'offers.id')
                 ->join('branches', 'offers.branch_id', '=', 'branches.id')
@@ -157,10 +130,7 @@ class OfferController extends Controller
                 ->groupBy('vendors.vendor_type')
                 ->orderBy('order_count', 'desc') 
                 ->first(); 
-
             $favoriteType = $userPreference ? $userPreference->vendor_type : null;
-
-            
             $query = offer::query()->select('offers.id', 'offers.title', 'offers.description', 'offers.image', 'offers.original_price', 'offers.discount_price', 'offers.expiration_time', 'offers.status', 'offers.branch_id', 'offers.created_at')
                 ->with([
                     'branch:id,branch_name,store_address,lat,long,vendor_id',
@@ -168,27 +138,17 @@ class OfferController extends Controller
                 ])
                 ->where('offers.status', 'active')
                 ->where('expiration_time', '>', now());
-
-            
             if ($request->filled('lat') && $request->filled('long')) {
                 $lat = $request->lat;
                 $lon = $request->long;
-
-                
                 $query->join('branches', 'offers.branch_id', '=', 'branches.id')
                     ->join('vendors', 'branches.vendor_id', '=', 'vendors.id');
-
-                
                 $distanceSql = "(6371 * acos(cos(radians($lat)) * cos(radians(branches.lat)) * cos(radians(branches.long) - radians($lon)) + sin(radians($lat)) * sin(radians(branches.lat))))";
                 $query->addSelect(\DB::raw("$distanceSql AS distance"));
-
-                
                 $favoriteTypeCondition = $favoriteType ? "'$favoriteType'" : "'none'";
                 $scoreSql = "CASE WHEN vendors.vendor_type = $favoriteTypeCondition THEN 15 ELSE 0 END - ($distanceSql * 1.5)";
-
                 $query->addSelect(\DB::raw("($scoreSql) AS recommendation_score"))
                     ->orderBy('recommendation_score', 'desc'); 
-
             } else {
                 if ($favoriteType) {
                     $query->join('branches', 'offers.branch_id', '=', 'branches.id')
@@ -199,19 +159,14 @@ class OfferController extends Controller
                     $query->orderBy('offers.expiration_time', 'asc');
                 }
             }
-
-           
             $recommendedOffers = $query->take(10)->get();
-
             return response()->json([
                 'status' => 'success',
                 'message' => 'Smart personalized recommendations fetched successfully',
                 'detected_favorite_category' => $favoriteType ?? 'No history yet (New User)',
                 'data' => $recommendedOffers
             ]);
-
         } catch (Exception $e) {
-            
             return response()->json([
                 'status' => 'success',
                 'data' => offer::where('status', 'active')->where('expiration_time', '>', now())->latest()->take(10)->get(),
@@ -219,12 +174,9 @@ class OfferController extends Controller
             ]);
         }
     }
-
-   
     public function store(Request $request)
     {
         try {
-            
             $data = $request->validate([
                 'branch_id' => 'required|exists:branches,id',
                 'title' => 'required|string',
@@ -235,34 +187,24 @@ class OfferController extends Controller
                 'discount_price' => 'required|numeric|lt:original_price',
                 'expiration_time' => 'required|date|after:now',
             ]);
-
             $vendor = Auth::user()->vendor;
-
             $branch = $vendor->branches()->find($request->branch_id);
-
             if (!$branch) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Unauthorized: This branch does not belong to you!'
                 ], 403);
             }
-
-            
             if ($request->hasFile('image')) {
                 $file = $request->file('image');
                 $imageName = time() . '_' . $file->getClientOriginalName();
                 $file->move(public_path('uploads'), $imageName);
                 $data['image'] = 'uploads/' . $imageName;
             }
-          
             if (isset($data['expiration_time'])) {
                 $data['expiration_time'] = date('Y-m-d H:i:s', strtotime($data['expiration_time']));
             }
-
-           
             $offer = $branch->offers()->create($data);
-
-           
             $customers = \App\Models\customer::all();
             foreach ($customers as $customer) {
                 \App\Models\notification::create([
@@ -272,28 +214,21 @@ class OfferController extends Controller
                     'is_read' => 0,
                 ]);
             }
-
-          
             if ($offer->image) {
                 $offer->image = url($offer->image);
             }
-
             return response()->json([
                 'status' => 'success',
                 'message' => 'Offer created successfully!',
                 'offer' => $offer
             ], 201);
-
         } catch (\Illuminate\Validation\ValidationException $e) {
-           
             return response()->json([
                 'status' => 'error',
                 'message' => 'Validation Failed!',
                 'errors' => $e->errors() 
             ], 422);
-
         } catch (\Exception $e) {
-            
             return response()->json([
                 'status' => 'error',
                 'message' => 'Something went wrong on the server!',
@@ -302,8 +237,6 @@ class OfferController extends Controller
             ], 500);
         }
     }
-
-   
     public function myOffers()
     {
         $vendor = Auth::user()->vendor;

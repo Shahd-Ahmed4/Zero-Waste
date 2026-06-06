@@ -9,34 +9,20 @@ use Illuminate\Support\Facades\DB;
 
 class SustainabilityController extends Controller
 {
-    // الثابت البيئي: الوجبة المتوسطة (نصف كيلو) تمنع 1.25 كجم من الكربون
     private $co2Factor = 1.25;
-
-    /**
-     * 1. الـ Admin Dashboard API
-     */
     public function getAdminMetrics()
     {
         try {
-            // إجمالي الوجبات المنقذة بالسيستم كله (الأوردرات الـ completed بس)
             $mealsSaved = order_item::whereHas('order', function ($q) {
                 $q->where('order_status', 'completed');
             })->sum('quantity');
-
-            // الأرباح المستردة لكل التجار (إجمالي أسعار البيع بعد الخصم)
             $recoveredRevenue = order_item::whereHas('order', function ($q) {
                 $q->where('order_status', 'completed');
             })->selectRaw('SUM(price * quantity) as total')->value('total') ?? 0;
-
-            // إجمالي توفير المستهلكين (الحسبة بقت مباشرة وسهلة من غير Join)
             $consumerSavings = order_item::whereHas('order', function ($q) {
                 $q->where('order_status', 'completed');
             })->selectRaw('SUM((original_price - price) * quantity) as savings')->value('savings') ?? 0;
-
-            // منع انبعاثات الكربون
             $co2Prevented = $mealsSaved * $this->co2Factor;
-
-            // بيانات الرسم البياني (Sustainability Chart) مجمعة بالشهور لآخر سنة
             $chartData = order_item::whereHas('order', function ($q) {
                 $q->where('order_status', 'completed');
             })
@@ -52,7 +38,6 @@ class SustainabilityController extends Controller
                         'co2_prevented' => $item->meals * $this->co2Factor
                     ];
                 });
-
             return response()->json([
                 'success' => true,
                 'metrics' => [
@@ -67,16 +52,10 @@ class SustainabilityController extends Controller
             return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
     }
-
-    /**
-     * 2. الـ Vendor Dashboard API
-     */
     public function getVendorMetrics(Request $request)
     {
         try {
             $vendorId = auth()->user()->vendor->id;
-
-            // لو في branch_id في الـ request، هيجيب metrics الـ branch ده بس
             $query = order_item::whereHas('order', function ($q) use ($vendorId, $request) {
                 $q->where('order_status', 'completed')
                     ->where('vendor_id', $vendorId);
@@ -84,14 +63,10 @@ class SustainabilityController extends Controller
                     $q->where('branch_id', $request->branch_id);
                 }
             });
-
             $mealsSaved = $query->sum('quantity');
-
             $recoveredRevenue = $query->selectRaw('SUM(price * quantity) as total')
                 ->value('total') ?? 0;
-
             $co2Prevented = $mealsSaved * $this->co2Factor;
-
             return response()->json([
                 'success' => true,
                 'metrics' => [
@@ -101,37 +76,24 @@ class SustainabilityController extends Controller
                     'green_badge' => $mealsSaved >= 50 ? 'Eco-Friendly Partner' : 'Rising Sustainability Hero'
                 ]
             ]);
-
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
     }
-
-    /**
-     * 3. الـ Customer Profile API
-     */
     public function getCustomerMetrics()
     {
         try {
-            // بنجيب الـ customer_id للزبون اللي عامل Login
             $customer = \App\Models\customer::where('user_id', auth()->id())->first();
-
             if (!$customer) {
                 return response()->json(['message' => 'Customer profile not found'], 404);
             }
-
-            // وجبات الزبون ده اللي اشتراها
             $mealsSaved = order_item::whereHas('order', function ($q) use ($customer) {
                 $q->where('order_status', 'completed')->where('customer_id', $customer->id);
             })->sum('quantity');
-
-            // الفلوس اللي الزبون وفرها (حسبة مباشرة بدون Join مع جدول العروض)
             $moneySaved = order_item::whereHas('order', function ($q) use ($customer) {
                 $q->where('order_status', 'completed')->where('customer_id', $customer->id);
             })->selectRaw('SUM((original_price - price) * quantity) as savings')->value('savings') ?? 0;
-
             $co2Prevented = $mealsSaved * $this->co2Factor;
-
             return response()->json([
                 'success' => true,
                 'metrics' => [

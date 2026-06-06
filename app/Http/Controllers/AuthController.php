@@ -50,7 +50,6 @@ class AuthController extends Controller
         } else {
             $welcomeMessage = "Welcome to our family! 🌟 Your account is active. Start exploring our latest offers now.";
         }
-
         \App\Models\notification::create([
             'user_id' => $user->id,
             'message' => $welcomeMessage,
@@ -101,24 +100,6 @@ class AuthController extends Controller
             'message' => 'Login successful'
         ], 200);
     }
-    public function profile(Request $request)
-    {
-        $user = $request->user();
-
-        if ($user->role === 'vendor') {
-            $user->load('vendor');
-        } elseif ($user->role === 'customer') {
-            $user->load('customer');
-        }
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Profile retrieved successfully',
-            'user_type' => $user->role,
-            'data' => $user
-        ], 200);
-    }
-
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
@@ -206,5 +187,22 @@ class AuthController extends Controller
         ]);
 
         return response()->json(['message' => 'Password changed successfully!']);
+    }
+    public function profile(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->role === 'vendor') {
+            $user->load('vendor');
+        } elseif ($user->role === 'customer') {
+            $user->load('customer');
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Profile retrieved successfully',
+            'user_type' => $user->role,
+            'data' => $user
+        ], 200);
     }
 }

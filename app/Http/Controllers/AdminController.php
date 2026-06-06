@@ -51,32 +51,37 @@ class AdminController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function pendingVendors()
+    public function StatusVendors(Request $request)
     {
-        $pendingVendors = vendor::whereHas('user', function ($query) {
-            $query->where('status', 'pending');
-        })
-            ->with([
-                'user' => function ($query) {
-                    $query->select('id', 'name', 'email', 'phone');
-                }
-            ])
-            ->select('id', 'user_id', 'business_name', 'logo', 'vendor_type', 'created_at')
-            ->latest()
-            ->get();
+        $status = $request->query('status');
 
-        if ($pendingVendors->isEmpty()) {
+        $query = vendor::with([
+            'user' => function ($q) {
+                $q->select('id', 'name', 'email', 'phone', 'status');
+            }
+        ])
+            ->select('id', 'user_id', 'business_name', 'logo', 'vendor_type', 'created_at');
+
+        if ($status) {
+            $query->whereHas('user', function ($q) use ($status) {
+                $q->where('status', $status);
+            });
+        }
+
+        $vendors = $query->latest()->get();
+
+        if ($vendors->isEmpty()) {
             return response()->json([
                 'status' => 'success',
-                'message' => 'No vendors waiting for approval.',
+                'message' => $status ? 'No vendors with status: ' . $status : 'No vendors found.',
                 'data' => []
             ]);
         }
 
         return response()->json([
             'status' => 'success',
-            'count' => $pendingVendors->count(),
-            'data' => $pendingVendors
+            'count' => $vendors->count(),
+            'data' => $vendors
         ]);
     }
 

@@ -12,26 +12,18 @@ use Exception;
 
 class AdminDashboardController extends Controller
 {
-    /**
-     * 1. الكروت الإحصائية والمالية (Admin Cards)
-     */
     public function getOverviewStats()
     {
-        
+
         $totalSales = order_item::whereHas('order', function ($query) {
             $query->where('order_status', 'completed');
         })
             ->select(DB::raw('SUM(price * quantity) as total_base_sales'))
             ->first();
-
-        
         $baseSales = (float) ($totalSales->total_base_sales ?? 0);
-
-        
         $customerCommissions = round($baseSales * 0.06, 2);
-        $vendorCommissions = round($baseSales * 0.12, 2); 
+        $vendorCommissions = round($baseSales * 0.12, 2);
         $platformPureProfit = $customerCommissions + $vendorCommissions;
-
         return response()->json([
             'success' => true,
             'data' => [
@@ -43,19 +35,15 @@ class AdminDashboardController extends Controller
                     'total_market_sales' => $baseSales,
                     'customer_fees_6_pct' => $customerCommissions,
                     'vendor_fees_12_pct' => $vendorCommissions,
-                    'net_platform_profit' => $platformPureProfit, 
+                    'net_platform_profit' => $platformPureProfit,
                     'currency' => 'EGP'
                 ]
             ]
         ]);
     }
-
-    /**
-     * 2. رسم بياني لأرباح المنصة بالشهور (Admin Line Chart)
-     */
     public function getMonthlyEarningsChart()
     {
-        
+
         $monthlyData = order_item::whereHas('order', function ($query) {
             $query->where('order_status', 'completed');
         })
@@ -70,10 +58,10 @@ class AdminDashboardController extends Controller
 
         $chartData = $monthlyData->map(function ($item) {
             $sales = (float) $item->monthly_base_sales;
-            $platformProfit = $sales * 0.18; 
+            $platformProfit = $sales * 0.18;
 
             return [
-                'month' => date("F", mktime(0, 0, 0, $item->month, 10)), 
+                'month' => date("F", mktime(0, 0, 0, $item->month, 10)),
                 'pure_profit' => round($platformProfit, 2)
             ];
         });
@@ -90,10 +78,10 @@ class AdminDashboardController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => [
-                   
+
                     'latest_users' => User::latest()->take(5)->get(['id', 'name', 'email', 'role', 'created_at']),
 
-                    
+
                     'latest_offers' => offer::latest()->take(5)->get(['id', 'title', 'status', 'created_at']),
                 ]
             ]);

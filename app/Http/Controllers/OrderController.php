@@ -12,24 +12,18 @@ use Illuminate\Support\Str;
 
 class OrderController extends Controller
 {
-    
     protected PaymentService $paymentService;
-
-   
     public function __construct(PaymentService $paymentService)
     {
         $this->paymentService = $paymentService;
     }
-
     public function store(Request $request)
     {
         try {
             $customer = customer::where('user_id', auth()->id())->first();
-
             if (!$customer) {
                 return response()->json(['message' => 'This user does not have a customer account.'], 404);
             }
-           
             $request->validate([
                 'items' => 'required|array|min:1',
                 'items.*.offer_id' => 'required|integer|exists:offers,id', 
@@ -43,7 +37,6 @@ class OrderController extends Controller
             $firstOffer = offer::with('branch.vendor')->findOrFail($request->items[0]['offer_id']);
             $branch = $firstOffer->branch;
             $vendor = $branch->vendor;
-            
             $vendorId = $vendor->id;
             foreach ($request->items as $item) {
                 $offerCheck = offer::with('branch.vendor')->findOrFail($item['offer_id']);
@@ -54,9 +47,7 @@ class OrderController extends Controller
                     throw new \Exception('All items must be from the same branch!');
                 }
             }
-           
             return DB::transaction(function () use ($request, $customer, $branch, $vendor) {
-                
                 $deliveryFees = 0;
                 if ($request->delivery_type === 'delivery') {
                     $distanceKm = $this->calculateDistance(
@@ -65,15 +56,11 @@ class OrderController extends Controller
                         $branch->lat,
                         $branch->long
                     );
-                    
                     $deliveryFees = min(50, max(15, round($distanceKm * 3, 2)));
                 }
-               
                 do {
                     $reservationId = 'RES-' . strtoupper(Str::random(6));
                 } while (\App\Models\order::where('reservation_id', $reservationId)->exists());
-
-                
                 $order = order::create([
                     'reservation_id' => $reservationId, 
                     'customer_id' => $customer->id,
@@ -88,11 +75,8 @@ class OrderController extends Controller
                     'total_amount' => 0,
                     'order_date' => now(),
                 ]);
-
-                
                 $total = 0;
                 foreach ($request->items as $item) {
-                    
                     $offer = offer::lockForUpdate()->findOrFail($item['offer_id']);
                     if ($offer->quantity_available < $item['quantity']) {
                         throw new \Exception("Insufficient stock for offer: {$offer->title}");
@@ -100,9 +84,7 @@ class OrderController extends Controller
                     $offer->decrement('quantity_available', $item['quantity']);
                     $offer->refresh();
                     $itemPrice = $offer->discount_price;
-
                     $total += ($itemPrice * $item['quantity']);
-
                     $order->items()->create([
                         'offer_id' => $offer->id,
                         'quantity' => $item['quantity'],
@@ -110,22 +92,15 @@ class OrderController extends Controller
                         'price' => $itemPrice,
                     ]);
                 }
-               
                 $customerCommission = round($total * 0.06, 2);
-               
                 $finalTotalAmount = $total + $customerCommission + $deliveryFees;
-
                 $order->update([
                     'commission_fee' => $customerCommission, 
                     'total_amount' => $finalTotalAmount
                 ]);
-
-               
                 if ($request->payment_method === 'card') {
                     try {
-                      
                         \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
-
                         $charge = \Stripe\PaymentIntent::create([
                             'amount' => (int) ($order->total_amount * 100), 
                             'currency' => 'egp',
@@ -140,8 +115,6 @@ class OrderController extends Controller
                                 'customer_id' => $customer->id,
                             ]
                         ]);
-
-                        
                         if ($charge->status === 'succeeded') {
                             \App\Models\payment::create([
                                 'order_id' => $order->id,
@@ -150,23 +123,17 @@ class OrderController extends Controller
                                 'payment_status' => 'completed',
                                 'payment_method' => 'card'
                             ]);
-
-                          
                             $order->update(['order_status' => 'processing']);
-
-                            
                             \App\Models\notification::create([
                                 'user_id' => $customer->user_id,
                                 'message' => "Payment successful! Order #{$order->id} is being prepared.",
                                 'type' => 'order',
                             ]);
-
                             \App\Models\notification::create([
                                 'user_id' => $vendor->user_id,
                                 'message' => "New paid order #{$order->id}! Please prepare it.",
                                 'type' => 'order',
                             ]);
-
                             return response()->json([
                                 'success' => true,
                                 'message' => 'Order created and payment successful!',

@@ -88,7 +88,7 @@ Route::middleware(['auth:sanctum', 'checkadmin'])->group(function () {
     Route::middleware(['checkadmin:super_admin,manager'])->group(function () {
         Route::put('/profile', [AdminController::class, 'updateProfile']);
         Route::put('/admin/change-password', [AdminController::class, 'changePassword']);
-        Route::get('/admin/vendor/pending', [AdminController::class, 'pendingVendors']);
+        Route::get('/admin/vendor/status', [AdminController::class, 'StatusVendors']);
         Route::get('/admin/vendor/{id}', [AdminController::class, 'showPendingDocs']);
         Route::post('/admin/vendor/{id}/accept', [AdminController::class, 'accept']);
         Route::post('/admin/vendor/{id}/reject', [AdminController::class, 'reject']);

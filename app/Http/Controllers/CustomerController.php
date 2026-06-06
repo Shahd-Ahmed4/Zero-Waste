@@ -8,13 +8,6 @@ use Illuminate\Support\Facades\Hash;
 
 class CustomerController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request)
     {
         // 1. اليوزر اللي عامل Login حالياً
