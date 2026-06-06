@@ -108,142 +108,161 @@ class OfferController extends Controller
         }
     }
     public function getSmartRecommendations(Request $request)
-    {
-        $user = auth('sanctum')->user();
+{
+    $user = auth('sanctum')->user();
 
-        if (!$user) {
-            $fallbackOffers = offer::where('status', 'active')
-                ->where('expiration_time', '>', now())
-                ->orderBy('expiration_time', 'asc')
-                ->take(10)
-                ->get();
+    if (!$user) {
+        return response()->json([
+            'status' => 'success',
+            'data'   => offer::where('status', 'active')
+                             ->where('expiration_time', '>', now())
+                             ->orderBy('expiration_time', 'asc')
+                             ->take(10)
+                             ->get()
+        ]);
+    }
 
-            return response()->json([
-                'status' => 'success',
-                'data' => $fallbackOffers
-            ]);
-        }
+    try {
+        // ── 1. Favorite vendor_type (frequency + recency) ──
+        $userPreference = order::where('orders.user_id', $user->id)
+            ->join('offers',   'orders.offer_id',    '=', 'offers.id')
+            ->join('branches', 'offers.branch_id',   '=', 'branches.id')
+            ->join('vendors',  'branches.vendor_id', '=', 'vendors.id')
+            ->select(
+                'vendors.vendor_type',
+                \DB::raw('COUNT(*) as order_count'),
+                \DB::raw('MAX(orders.created_at) as last_ordered_at'),
+                \DB::raw('DATEDIFF(NOW(), MAX(orders.created_at)) as days_since_last_order')
+            )
+            ->groupBy('vendors.vendor_type')
+            ->orderByRaw('COUNT(*) DESC, MAX(orders.created_at) DESC')
+            ->first();
 
-        try {
-            // ── 1. Get user's favorite vendor_type (frequency + recency weighted) ──
-            $userPreference = order::where('orders.user_id', $user->id)
-                ->join('offers', 'orders.offer_id', '=', 'offers.id')
-                ->join('branches', 'offers.branch_id', '=', 'branches.id')
-                ->join('vendors', 'branches.vendor_id', '=', 'vendors.id')
-                ->select(
-                    'vendors.vendor_type',
-                    \DB::raw('COUNT(*) as order_count'),
-                    \DB::raw('MAX(orders.created_at) as last_ordered_at'),
-                    \DB::raw('DATEDIFF(NOW(), MAX(orders.created_at)) as days_since_last_order')
-                )
-                ->groupBy('vendors.vendor_type')
-                ->orderByRaw('COUNT(*) DESC, MAX(orders.created_at) DESC')
-                ->first();
+        $favoriteType       = $userPreference?->vendor_type;
+        $daysSinceLastOrder = $userPreference?->days_since_last_order ?? 9999;
 
-            $favoriteType = $userPreference?->vendor_type;
-            $daysSinceLastOrder = $userPreference?->days_since_last_order ?? 9999;
+        // ── 2. Vendor IDs the user ordered from before ──
+        $previousVendorIds = order::where('orders.user_id', $user->id)
+            ->join('offers',   'orders.offer_id',  '=', 'offers.id')
+            ->join('branches', 'offers.branch_id', '=', 'branches.id')
+            ->pluck('branches.vendor_id')
+            ->unique()
+            ->values()
+            ->toArray();
 
-            // ── 2. Get vendor IDs the user has ordered from before (for "ordered before" boost) ──
-            $previousVendorIds = order::where('orders.user_id', $user->id)
-                ->join('offers', 'orders.offer_id', '=', 'offers.id')
-                ->join('branches', 'offers.branch_id', '=', 'branches.id')
-                ->pluck('branches.vendor_id')
-                ->unique()
-                ->values()
-                ->toArray();
+        // ── 3. Branch IDs from the user's LAST 5 orders (highest priority tier) ──
+        $lastOrderedBranchIds = order::where('orders.user_id', $user->id)
+            ->join('offers',   'orders.offer_id',  '=', 'offers.id')
+            ->join('branches', 'offers.branch_id', '=', 'branches.id')
+            ->orderBy('orders.created_at', 'desc')
+            ->limit(5)
+            ->pluck('branches.id')
+            ->unique()
+            ->values()
+            ->toArray();
 
-            // ── 3. Build base query (always JOIN branches + vendors for consistent SQL) ──
-            $query = offer::query()
-                ->select(
-                    'offers.id',
-                    'offers.title',
-                    'offers.description',
-                    'offers.image',
-                    'offers.original_price',
-                    'offers.discount_price',
-                    'offers.expiration_time',
-                    'offers.status',
-                    'offers.branch_id',
-                    'offers.created_at'
-                )
-                ->join('branches', 'offers.branch_id', '=', 'branches.id')
-                ->join('vendors', 'branches.vendor_id', '=', 'vendors.id')
-                ->with([
-                    'branch:id,branch_name,store_address,lat,long,vendor_id',
-                    'branch.vendor:id,business_name,logo,vendor_type'
-                ])
-                ->where('offers.status', 'active')
-                ->where('offers.expiration_time', '>', now());
+        // ── 4. Base query ──
+        $favTypeBinding  = $favoriteType ?? '__none__';
+        $prevVendorList  = empty($previousVendorIds)
+            ? '0'
+            : implode(',', array_map('intval', $previousVendorIds));
 
-            // ── 4. Build personalized score SQL ──
-            $favTypeBinding = $favoriteType ?? '__none__';
-            $recencyScore = $daysSinceLastOrder < 9999
-                ? "GREATEST(0, (20 - (DATEDIFF(NOW(), '" . now()->subDays($daysSinceLastOrder)->toDateTimeString() . "') / 30.0) * 20))"
-                : "0";
+        $lastBranchList  = empty($lastOrderedBranchIds)
+            ? '0'
+            : implode(',', array_map('intval', $lastOrderedBranchIds));
 
-            $prevVendorList = empty($previousVendorIds)
-                ? 'NULL'
-                : implode(',', array_map('intval', $previousVendorIds));
+        $recencyScore = $daysSinceLastOrder < 9999
+            ? "GREATEST(0, 20 - ({$daysSinceLastOrder} / 30.0 * 20))"
+            : "0";
 
-            if ($request->filled('lat') && $request->filled('long')) {
-                $lat = (float) $request->lat;
-                $lon = (float) $request->long;
+        $query = offer::query()
+            ->select(
+                'offers.id',
+                'offers.title',
+                'offers.description',
+                'offers.image',
+                'offers.original_price',
+                'offers.discount_price',
+                'offers.expiration_time',
+                'offers.status',
+                'offers.branch_id',
+                'offers.created_at'
+            )
+            ->join('branches', 'offers.branch_id',   '=', 'branches.id')
+            ->join('vendors',  'branches.vendor_id', '=', 'vendors.id')
+            ->with([
+                'branch:id,branch_name,store_address,lat,long,vendor_id',
+                'branch.vendor:id,business_name,logo,vendor_type'
+            ])
+            ->where('offers.status', 'active')
+            ->where('offers.expiration_time', '>', now());
 
-                $distanceSql = "(6371 * acos(
+        // ── 5. Tier column: 0 = from recently ordered branch (top), 1 = everything else ──
+        $tierSql = "CASE WHEN offers.branch_id IN ({$lastBranchList}) THEN 0 ELSE 1 END";
+
+        if ($request->filled('lat') && $request->filled('long')) {
+            $lat = (float) $request->lat;
+            $lon = (float) $request->long;
+
+            $distanceSql = "(6371 * acos(
                 cos(radians(?)) * cos(radians(branches.lat))
                 * cos(radians(branches.long) - radians(?))
                 + sin(radians(?)) * sin(radians(branches.lat))
             ))";
 
-                $query->addSelect(\DB::raw("$distanceSql AS distance"))
-                    ->addBinding([$lat, $lon, $lat], 'select');
-
-                $scoreSql = "
+            $scoreSql = "
                 (CASE WHEN vendors.vendor_type = ? THEN 15 ELSE 0 END)
                 + ({$recencyScore})
                 + (CASE WHEN vendors.id IN ({$prevVendorList}) THEN 10 ELSE 0 END)
                 - (($distanceSql) * 1.5)
             ";
 
-                $query->addSelect(\DB::raw("($scoreSql) AS recommendation_score"))
-                    ->addBinding([$favTypeBinding, $lat, $lon, $lat], 'select')
-                    ->orderBy('recommendation_score', 'desc');
+            $query
+                ->addSelect(\DB::raw("$distanceSql AS distance"))
+                ->addBinding([$lat, $lon, $lat], 'select')
+                ->addSelect(\DB::raw("($scoreSql) AS recommendation_score"))
+                ->addBinding([$favTypeBinding, $lat, $lon, $lat], 'select')
+                ->addSelect(\DB::raw("($tierSql) AS priority_tier"))
+                ->orderBy('priority_tier', 'asc')       // tier 0 (recent orders) always first
+                ->orderBy('recommendation_score', 'desc'); // within each tier, best score wins
 
-            } else {
-                // No location — score without distance component
-                $scoreSql = "
+        } else {
+            $scoreSql = "
                 (CASE WHEN vendors.vendor_type = ? THEN 15 ELSE 0 END)
                 + ({$recencyScore})
                 + (CASE WHEN vendors.id IN ({$prevVendorList}) THEN 10 ELSE 0 END)
             ";
 
-                $query->addSelect(\DB::raw("($scoreSql) AS recommendation_score"))
-                    ->addBinding([$favTypeBinding], 'select')
-                    ->orderBy('recommendation_score', 'desc')
-                    ->orderBy('offers.expiration_time', 'asc'); // tiebreaker
-            }
-
-            $recommendedOffers = $query->take(10)->get();
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Smart personalized recommendations fetched successfully',
-                'detected_favorite_category' => $favoriteType ?? 'No history yet (New User)',
-                'data' => $recommendedOffers
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'success',
-                'data' => offer::where('status', 'active')
-                    ->where('expiration_time', '>', now())
-                    ->latest()
-                    ->take(10)
-                    ->get(),
-                'debug_error' => app()->environment('local') ? $e->getMessage() : null
-            ]);
+            $query
+                ->addSelect(\DB::raw("($scoreSql) AS recommendation_score"))
+                ->addBinding([$favTypeBinding], 'select')
+                ->addSelect(\DB::raw("($tierSql) AS priority_tier"))
+                ->orderBy('priority_tier', 'asc')
+                ->orderBy('recommendation_score', 'desc')
+                ->orderBy('offers.expiration_time', 'asc');
         }
+
+        $recommendedOffers = $query->take(10)->get();
+
+        return response()->json([
+            'status'                     => 'success',
+            'message'                    => 'Smart personalized recommendations fetched successfully',
+            'detected_favorite_category' => $favoriteType ?? 'No history yet (New User)',
+            'data'                       => $recommendedOffers
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'status'       => 'success',
+            'data'         => offer::where('status', 'active')
+                                   ->where('expiration_time', '>', now())
+                                   ->latest()
+                                   ->take(10)
+                                   ->get(),
+            'debug_error'  => app()->environment('local') ? $e->getMessage() : null
+        ]);
     }
+}
     public function store(Request $request)
     {
         try {
