@@ -261,11 +261,11 @@ class OfferSeeder extends Seeder
                         $disabledCount++;
                     }
                     $expirationHours = match ($vendorType) {
-                        'restaurant' => rand(12, 16),
-                        'cafe' => rand(12, 18),
-                        'bakery' => rand(16, 20),
-                        'hotel' => rand(14, 18),
-                        default => rand(20, 24),
+                        'restaurant' => rand(1, 6),
+                        'cafe' => rand(1, 6),
+                        'bakery' => rand(1, 8),
+                        'hotel' => rand(1, 12),
+                        default => rand(20, 48),
                     };
 
                     offer::create([
