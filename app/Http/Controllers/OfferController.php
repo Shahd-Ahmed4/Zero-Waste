@@ -111,23 +111,33 @@ public function getSmartRecommendations(Request $request)
 {
     $user = auth('sanctum')->user();
 
-    // 1️⃣ لو المستخدم مش عامل Login (ضيف مثلاً)، هنرجعله العروض العادية حسب الوقت لعدم وجود تاريخ شرائي
     if (!$user) {
-        $fallbackOffers = offer::where('status', 'active')
-            ->where('expiration_time', '>', now())
-            ->orderBy('expiration_time', 'asc')
-            ->take(10)
-            ->get();
-
         return response()->json([
             'status' => 'success',
-            'data' => $fallbackOffers
+            'data' => offer::where('status', 'active')
+                ->where('expiration_time', '>', now())
+                ->orderBy('expiration_time', 'asc')
+                ->take(10)
+                ->get()
+        ]);
+    }
+
+    // جيب الـ customer المرتبط بالـ user
+    $customer = \App\Models\customer::where('user_id', $user->id)->first();
+
+    if (!$customer) {
+        return response()->json([
+            'status' => 'success',
+            'data' => offer::where('status', 'active')
+                ->where('expiration_time', '>', now())
+                ->orderBy('expiration_time', 'asc')
+                ->take(10)
+                ->get()
         ]);
     }
 
     try {
-        // 2️⃣ السحر الأول: نكتشف "ذوق مصلحة الزبون" بناءً على تاريخ أوردراته السابقة
-        $userPreference = order::where('orders.user_id', $user->id)
+        $userPreference = order::where('orders.customer_id', $customer->id)
             ->join('offers', 'orders.offer_id', '=', 'offers.id')
             ->join('branches', 'offers.branch_id', '=', 'branches.id')
             ->join('vendors', 'branches.vendor_id', '=', 'vendors.id')
@@ -138,8 +148,6 @@ public function getSmartRecommendations(Request $request)
 
         $favoriteType = $userPreference ? $userPreference->vendor_type : null;
 
-        // 3️⃣ بناء الاستعلام الأساسي — بنعمل JOIN دايماً عشان vendor_type يكون متاح في الـ CASE WHEN
-        // ✅ FIX: استبدلنا ->with() بـ manual selects عشان مفيش conflict بين eager loading والـ raw JOINs
         $query = offer::query()
             ->select(
                 'offers.id',
@@ -152,37 +160,30 @@ public function getSmartRecommendations(Request $request)
                 'offers.status',
                 'offers.branch_id',
                 'offers.created_at',
-                // Branch columns
                 'branches.branch_name',
                 'branches.store_address',
                 'branches.lat as branch_lat',
                 'branches.long as branch_long',
                 'branches.vendor_id',
-                // Vendor columns
                 'vendors.id as vendor_id_fk',
                 'vendors.business_name',
                 'vendors.logo',
                 'vendors.vendor_type'
             )
-            // ✅ FIX: JOIN دايماً هنا مرة وحدة بس — مش جوه الـ if/else عشان نتجنب duplicate JOIN
             ->join('branches', 'offers.branch_id', '=', 'branches.id')
             ->join('vendors', 'branches.vendor_id', '=', 'vendors.id')
             ->where('offers.status', 'active')
             ->where('offers.expiration_time', '>', now());
 
-        // 4️⃣ السحر الثاني: دمج "الموقع" مع "ذوق الزبون الشرائي" في الترتيب (Scoring)
         if ($request->filled('lat') && $request->filled('long')) {
             $lat = (float) $request->lat;
             $lon = (float) $request->long;
 
-            // ✅ FIX: bindings بدل string interpolation عشان نمنع SQL Injection
             $distanceSql = "(6371 * acos(cos(radians(?)) * cos(radians(branches.lat)) * cos(radians(branches.long) - radians(?)) + sin(radians(?)) * sin(radians(branches.lat))))";
 
             $query->addSelect(\DB::raw("$distanceSql AS distance"))
                   ->addBinding([$lat, $lon, $lat], 'select');
 
-            // ✅ FIX: LEAST() عشان penalty المسافة ميطغاش على bonus الـ favorite type
-            // ✅ FIX: binding لـ favoriteType بدل string interpolation
             $scoreSql = "CASE WHEN vendors.vendor_type = ? THEN 15 ELSE 0 END - LEAST($distanceSql * 1.5, 10)";
 
             $query->addSelect(\DB::raw("($scoreSql) AS recommendation_score"))
@@ -190,9 +191,7 @@ public function getSmartRecommendations(Request $request)
                   ->orderBy('recommendation_score', 'desc');
 
         } else {
-            // 5️⃣ لو قافل الـ GPS، هنرتب بناءً على ذوقه الشرائي ثم قرب انتهاء الوقت
             if ($favoriteType) {
-                // ✅ FIX: binding بدل string interpolation في orderByRaw
                 $query->orderByRaw("CASE WHEN vendors.vendor_type = ? THEN 0 ELSE 1 END", [$favoriteType])
                       ->orderBy('offers.expiration_time', 'asc');
             } else {
@@ -202,7 +201,6 @@ public function getSmartRecommendations(Request $request)
 
         $recommendedOffers = $query->take(10)->get();
 
-        // ✅ إعادة تشكيل الـ response عشان يشبه شكل ->with() القديم وما يأثرش على الـ frontend
         $recommendedOffers->transform(function ($offer) {
             $offer->branch = (object) [
                 'id'            => $offer->branch_id,
@@ -219,7 +217,6 @@ public function getSmartRecommendations(Request $request)
                 ],
             ];
 
-            // نحذف الـ flat columns الزيادة من الـ offer مباشرةً
             unset(
                 $offer->branch_name, $offer->store_address,
                 $offer->branch_lat, $offer->branch_long,
@@ -237,7 +234,7 @@ public function getSmartRecommendations(Request $request)
             'data'                       => $recommendedOffers
         ]);
 
-    } catch (Exception $e) {
+    } catch (\Exception $e) {
         return response()->json([
             'status'      => 'success',
             'data'        => offer::where('status', 'active')->where('expiration_time', '>', now())->latest()->take(10)->get(),
