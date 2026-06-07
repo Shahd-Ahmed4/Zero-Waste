@@ -107,52 +107,144 @@ class OfferController extends Controller
             ], 500);
         }
     }
-    public function getSmartRecommendations(Request $request)
-    {
-        $user = auth('sanctum')->user();
-        $customer = \App\Models\customer::where('user_id', $user->id)->first();
+public function getSmartRecommendations(Request $request)
+{
+    $user = auth('sanctum')->user();
 
-        // 1. استخراج الـ Categories اللي العميل طلب منها قبل كدة (التفضيلات)
-        $favoriteCategories = order::where('orders.customer_id', $customer->id)
-            ->where('orders.order_status', 'completed')
+    // 1️⃣ لو المستخدم مش عامل Login (ضيف مثلاً)، هنرجعله العروض العادية حسب الوقت لعدم وجود تاريخ شرائي
+    if (!$user) {
+        $fallbackOffers = offer::where('status', 'active')
+            ->where('expiration_time', '>', now())
+            ->orderBy('expiration_time', 'asc')
+            ->take(10)
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $fallbackOffers
+        ]);
+    }
+
+    try {
+        // 2️⃣ السحر الأول: نكتشف "ذوق مصلحة الزبون" بناءً على تاريخ أوردراته السابقة
+        $userPreference = order::where('orders.user_id', $user->id)
             ->join('offers', 'orders.offer_id', '=', 'offers.id')
             ->join('branches', 'offers.branch_id', '=', 'branches.id')
             ->join('vendors', 'branches.vendor_id', '=', 'vendors.id')
-            ->pluck('vendors.vendor_type')
-            ->toArray();
+            ->select('vendors.vendor_type', \DB::raw('COUNT(*) as order_count'))
+            ->groupBy('vendors.vendor_type')
+            ->orderBy('order_count', 'desc')
+            ->first();
 
-        $favTypes = array_unique($favoriteCategories);
+        $favoriteType = $userPreference ? $userPreference->vendor_type : null;
 
-        // 2. بناء الـ Query مع إضافة الـ Scoring Logic
+        // 3️⃣ بناء الاستعلام الأساسي — بنعمل JOIN دايماً عشان vendor_type يكون متاح في الـ CASE WHEN
+        // ✅ FIX: استبدلنا ->with() بـ manual selects عشان مفيش conflict بين eager loading والـ raw JOINs
         $query = offer::query()
+            ->select(
+                'offers.id',
+                'offers.title',
+                'offers.description',
+                'offers.image',
+                'offers.original_price',
+                'offers.discount_price',
+                'offers.expiration_time',
+                'offers.status',
+                'offers.branch_id',
+                'offers.created_at',
+                // Branch columns
+                'branches.branch_name',
+                'branches.store_address',
+                'branches.lat as branch_lat',
+                'branches.long as branch_long',
+                'branches.vendor_id',
+                // Vendor columns
+                'vendors.id as vendor_id_fk',
+                'vendors.business_name',
+                'vendors.logo',
+                'vendors.vendor_type'
+            )
+            // ✅ FIX: JOIN دايماً هنا مرة وحدة بس — مش جوه الـ if/else عشان نتجنب duplicate JOIN
             ->join('branches', 'offers.branch_id', '=', 'branches.id')
             ->join('vendors', 'branches.vendor_id', '=', 'vendors.id')
-            ->select('offers.*', 'branches.lat', 'branches.long');
+            ->where('offers.status', 'active')
+            ->where('offers.expiration_time', '>', now());
 
-        // 3. حساب المسافة (Haversine Formula)
-        $lat = $request->lat;
-        $long = $request->long;
-        $distanceSql = "(6371 * acos(cos(radians($lat)) * cos(radians(branches.lat)) * cos(radians(branches.long) - radians($long)) + sin(radians($lat)) * sin(radians(branches.lat))))";
+        // 4️⃣ السحر الثاني: دمج "الموقع" مع "ذوق الزبون الشرائي" في الترتيب (Scoring)
+        if ($request->filled('lat') && $request->filled('long')) {
+            $lat = (float) $request->lat;
+            $lon = (float) $request->long;
 
-        // 4. معادلة الترتيب (الذكاء الحقيقي)
-        // - لو النوع متطابق مع الـ History: بنزود 50 نقطة (عشان يظهر في الأول)
-        // - كل ما المسافة تزيد: بنخصم نقاط (عشان القريب يظهر)
-        $typeMatchSql = count($favTypes) > 0
-            ? "CASE WHEN vendors.vendor_type IN ('" . implode("','", $favTypes) . "') THEN 50 ELSE 0 END"
-            : "0";
+            // ✅ FIX: bindings بدل string interpolation عشان نمنع SQL Injection
+            $distanceSql = "(6371 * acos(cos(radians(?)) * cos(radians(branches.lat)) * cos(radians(branches.long) - radians(?)) + sin(radians(?)) * sin(radians(branches.lat))))";
 
-        $query->addSelect(\DB::raw("({$typeMatchSql} - ({$distanceSql} * 2)) as relevance_score"));
+            $query->addSelect(\DB::raw("$distanceSql AS distance"))
+                  ->addBinding([$lat, $lon, $lat], 'select');
 
-        // 5. التنفيذ
+            // ✅ FIX: LEAST() عشان penalty المسافة ميطغاش على bonus الـ favorite type
+            // ✅ FIX: binding لـ favoriteType بدل string interpolation
+            $scoreSql = "CASE WHEN vendors.vendor_type = ? THEN 15 ELSE 0 END - LEAST($distanceSql * 1.5, 10)";
+
+            $query->addSelect(\DB::raw("($scoreSql) AS recommendation_score"))
+                  ->addBinding([$favoriteType ?? 'none', $lat, $lon, $lat], 'select')
+                  ->orderBy('recommendation_score', 'desc');
+
+        } else {
+            // 5️⃣ لو قافل الـ GPS، هنرتب بناءً على ذوقه الشرائي ثم قرب انتهاء الوقت
+            if ($favoriteType) {
+                // ✅ FIX: binding بدل string interpolation في orderByRaw
+                $query->orderByRaw("CASE WHEN vendors.vendor_type = ? THEN 0 ELSE 1 END", [$favoriteType])
+                      ->orderBy('offers.expiration_time', 'asc');
+            } else {
+                $query->orderBy('offers.expiration_time', 'asc');
+            }
+        }
+
+        $recommendedOffers = $query->take(10)->get();
+
+        // ✅ إعادة تشكيل الـ response عشان يشبه شكل ->with() القديم وما يأثرش على الـ frontend
+        $recommendedOffers->transform(function ($offer) {
+            $offer->branch = (object) [
+                'id'            => $offer->branch_id,
+                'branch_name'   => $offer->branch_name,
+                'store_address' => $offer->store_address,
+                'lat'           => $offer->branch_lat,
+                'long'          => $offer->branch_long,
+                'vendor_id'     => $offer->vendor_id,
+                'vendor'        => (object) [
+                    'id'            => $offer->vendor_id_fk,
+                    'business_name' => $offer->business_name,
+                    'logo'          => $offer->logo,
+                    'vendor_type'   => $offer->vendor_type,
+                ],
+            ];
+
+            // نحذف الـ flat columns الزيادة من الـ offer مباشرةً
+            unset(
+                $offer->branch_name, $offer->store_address,
+                $offer->branch_lat, $offer->branch_long,
+                $offer->vendor_id, $offer->vendor_id_fk,
+                $offer->business_name, $offer->logo, $offer->vendor_type
+            );
+
+            return $offer;
+        });
+
         return response()->json([
-            'status' => 'success',
-            'data' => $query->where('offers.status', 'active')
-                ->where('offers.expiration_time', '>', now())
-                ->orderBy('relevance_score', 'desc') // الترتيب بناءً على المعادلة
-                ->take(10)
-                ->get()
+            'status'                     => 'success',
+            'message'                    => 'Smart personalized recommendations fetched successfully',
+            'detected_favorite_category' => $favoriteType ?? 'No history yet (New User)',
+            'data'                       => $recommendedOffers
+        ]);
+
+    } catch (Exception $e) {
+        return response()->json([
+            'status'      => 'success',
+            'data'        => offer::where('status', 'active')->where('expiration_time', '>', now())->latest()->take(10)->get(),
+            'debug_error' => $e->getMessage()
         ]);
     }
+}
     public function store(Request $request)
     {
         try {
