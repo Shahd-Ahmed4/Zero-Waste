@@ -122,9 +122,23 @@ class OfferController extends Controller
             ]);
         }
 
+        // ── جيب الـ customer المرتبط بالـ user ──
+        $customer = \App\Models\customer::where('user_id', $user->id)->first();
+
+        if (!$customer) {
+            return response()->json([
+                'status' => 'success',
+                'data' => offer::where('status', 'active')
+                    ->where('expiration_time', '>', now())
+                    ->orderBy('expiration_time', 'asc')
+                    ->take(10)
+                    ->get()
+            ]);
+        }
+
         try {
-            // ── 1. Get user's last 10 ordered offer IDs (exact offers they requested) ──
-            $lastOrderedOfferIds = order::where('user_id', $user->id)
+            // ── 1. Get user's last 10 ordered offer IDs ──
+            $lastOrderedOfferIds = order::where('customer_id', $customer->id)
                 ->orderBy('created_at', 'desc')
                 ->limit(10)
                 ->pluck('offer_id')
@@ -132,8 +146,8 @@ class OfferController extends Controller
                 ->values()
                 ->toArray();
 
-            // ── 2. Get vendor IDs ranked by recency (most recently ordered vendor first) ──
-            $orderedVendors = order::where('orders.user_id', $user->id)
+            // ── 2. Get vendor IDs ranked by recency ──
+            $orderedVendors = order::where('orders.customer_id', $customer->id)
                 ->join('offers', 'orders.offer_id', '=', 'offers.id')
                 ->join('branches', 'offers.branch_id', '=', 'branches.id')
                 ->join('vendors', 'branches.vendor_id', '=', 'vendors.id')
@@ -148,11 +162,8 @@ class OfferController extends Controller
                 ->orderBy('last_ordered_at', 'desc')
                 ->get();
 
-            // Favorite type = vendor_type with most orders (recency tiebreak)
             $favoriteType = $orderedVendors->sortByDesc('order_count')->first()?->vendor_type;
             $daysSinceLastOrder = $orderedVendors->first()?->days_since_last_order ?? 9999;
-
-            // Vendor IDs the user ever ordered from (ordered by recency for FIELD() ranking)
             $orderedVendorIds = $orderedVendors->pluck('vendor_id')->toArray();
 
             // ── 3. Build SQL lists ──
@@ -171,9 +182,6 @@ class OfferController extends Controller
                 : "0";
 
             // ── 4. Priority tier ──
-            // Tier 0 = exact offers user ordered before (still active)   ← appears FIRST
-            // Tier 1 = other offers from vendors user ordered from before
-            // Tier 2 = everything else
             $tierSql = "
             CASE
                 WHEN offers.id IN ({$lastOfferList}) THEN 0
@@ -182,13 +190,11 @@ class OfferController extends Controller
             END
         ";
 
-            // ── 5. Within tier 0: rank by how recently this exact offer was ordered ──
-            // FIELD() returns position in list (1 = most recent), 0 if not in list
             $recentOfferRankSql = empty($lastOrderedOfferIds)
                 ? "0"
                 : "FIELD(offers.id, {$lastOfferList})";
 
-            // ── 6. Base query ──
+            // ── 5. Base query ──
             $query = offer::query()
                 ->select(
                     'offers.id',
@@ -272,7 +278,7 @@ class OfferController extends Controller
                     ->latest()
                     ->take(10)
                     ->get(),
-                'debug_error' => app()->environment('local') ? $e->getMessage() : null
+                'debug_error' => $e->getMessage()
             ]);
         }
     }
