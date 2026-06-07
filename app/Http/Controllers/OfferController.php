@@ -107,141 +107,148 @@ class OfferController extends Controller
             ], 500);
         }
     }
-public function getSmartRecommendations(Request $request)
-{
-    $user = auth('sanctum')->user();
+    public function getSmartRecommendations(Request $request)
+    {
+        $user = auth('sanctum')->user();
 
-    if (!$user) {
-        return response()->json([
-            'status' => 'success',
-            'data' => offer::where('status', 'active')
-                ->where('expiration_time', '>', now())
-                ->orderBy('expiration_time', 'asc')
-                ->take(10)
-                ->get()
-        ]);
-    }
-
-    // جيب الـ customer المرتبط بالـ user
-    $customer = \App\Models\customer::where('user_id', $user->id)->first();
-
-    if (!$customer) {
-        return response()->json([
-            'status' => 'success',
-            'data' => offer::where('status', 'active')
-                ->where('expiration_time', '>', now())
-                ->orderBy('expiration_time', 'asc')
-                ->take(10)
-                ->get()
-        ]);
-    }
-
-    try {
-        $userPreference = order::where('orders.customer_id', $customer->id)
-            ->join('offers', 'orders.offer_id', '=', 'offers.id')
-            ->join('branches', 'offers.branch_id', '=', 'branches.id')
-            ->join('vendors', 'branches.vendor_id', '=', 'vendors.id')
-            ->select('vendors.vendor_type', \DB::raw('COUNT(*) as order_count'))
-            ->groupBy('vendors.vendor_type')
-            ->orderBy('order_count', 'desc')
-            ->first();
-
-        $favoriteType = $userPreference ? $userPreference->vendor_type : null;
-
-        $query = offer::query()
-            ->select(
-                'offers.id',
-                'offers.title',
-                'offers.description',
-                'offers.image',
-                'offers.original_price',
-                'offers.discount_price',
-                'offers.expiration_time',
-                'offers.status',
-                'offers.branch_id',
-                'offers.created_at',
-                'branches.branch_name',
-                'branches.store_address',
-                'branches.lat as branch_lat',
-                'branches.long as branch_long',
-                'branches.vendor_id',
-                'vendors.id as vendor_id_fk',
-                'vendors.business_name',
-                'vendors.logo',
-                'vendors.vendor_type'
-            )
-            ->join('branches', 'offers.branch_id', '=', 'branches.id')
-            ->join('vendors', 'branches.vendor_id', '=', 'vendors.id')
-            ->where('offers.status', 'active')
-            ->where('offers.expiration_time', '>', now());
-
-        if ($request->filled('lat') && $request->filled('long')) {
-            $lat = (float) $request->lat;
-            $lon = (float) $request->long;
-
-            $distanceSql = "(6371 * acos(cos(radians(?)) * cos(radians(branches.lat)) * cos(radians(branches.long) - radians(?)) + sin(radians(?)) * sin(radians(branches.lat))))";
-
-            $query->addSelect(\DB::raw("$distanceSql AS distance"))
-                  ->addBinding([$lat, $lon, $lat], 'select');
-
-            $scoreSql = "CASE WHEN vendors.vendor_type = ? THEN 15 ELSE 0 END - LEAST($distanceSql * 1.5, 10)";
-
-            $query->addSelect(\DB::raw("($scoreSql) AS recommendation_score"))
-                  ->addBinding([$favoriteType ?? 'none', $lat, $lon, $lat], 'select')
-                  ->orderBy('recommendation_score', 'desc');
-
-        } else {
-            if ($favoriteType) {
-                $query->orderByRaw("CASE WHEN vendors.vendor_type = ? THEN 0 ELSE 1 END", [$favoriteType])
-                      ->orderBy('offers.expiration_time', 'asc');
-            } else {
-                $query->orderBy('offers.expiration_time', 'asc');
-            }
+        if (!$user) {
+            return response()->json([
+                'status' => 'success',
+                'data' => offer::where('status', 'active')
+                    ->where('expiration_time', '>', now())
+                    ->orderBy('expiration_time', 'asc')
+                    ->take(10)
+                    ->get()
+            ]);
         }
 
-        $recommendedOffers = $query->take(10)->get();
+        // جيب الـ customer المرتبط بالـ user
+        $customer = \App\Models\customer::where('user_id', $user->id)->first();
 
-        $recommendedOffers->transform(function ($offer) {
-            $offer->branch = (object) [
-                'id'            => $offer->branch_id,
-                'branch_name'   => $offer->branch_name,
-                'store_address' => $offer->store_address,
-                'lat'           => $offer->branch_lat,
-                'long'          => $offer->branch_long,
-                'vendor_id'     => $offer->vendor_id,
-                'vendor'        => (object) [
-                    'id'            => $offer->vendor_id_fk,
-                    'business_name' => $offer->business_name,
-                    'logo'          => $offer->logo,
-                    'vendor_type'   => $offer->vendor_type,
-                ],
-            ];
+        if (!$customer) {
+            return response()->json([
+                'status' => 'success',
+                'data' => offer::where('status', 'active')
+                    ->where('expiration_time', '>', now())
+                    ->orderBy('expiration_time', 'asc')
+                    ->take(10)
+                    ->get()
+            ]);
+        }
 
-            unset(
-                $offer->branch_name, $offer->store_address,
-                $offer->branch_lat, $offer->branch_long,
-                $offer->vendor_id, $offer->vendor_id_fk,
-                $offer->business_name, $offer->logo, $offer->vendor_type
-            );
+        try {
+            $userPreference = \App\Models\order_item::where('order_items.offer_id', '!=', null)
+                ->join('orders', 'order_items.order_id', '=', 'orders.id')
+                ->join('offers', 'order_items.offer_id', '=', 'offers.id')
+                ->join('branches', 'offers.branch_id', '=', 'branches.id')
+                ->join('vendors', 'branches.vendor_id', '=', 'vendors.id')
+                ->where('orders.customer_id', $customer->id)
+                ->select('vendors.vendor_type', \DB::raw('COUNT(*) as order_count'))
+                ->groupBy('vendors.vendor_type')
+                ->orderBy('order_count', 'desc')
+                ->first();
 
-            return $offer;
-        });
+            $favoriteType = $userPreference ? $userPreference->vendor_type : null;
 
-        return response()->json([
-            'status'                     => 'success',
-            'message'                    => 'Smart personalized recommendations fetched successfully',
-            'detected_favorite_category' => $favoriteType ?? 'No history yet (New User)',
-            'data'                       => $recommendedOffers
-        ]);
+            $query = offer::query()
+                ->select(
+                    'offers.id',
+                    'offers.title',
+                    'offers.description',
+                    'offers.image',
+                    'offers.original_price',
+                    'offers.discount_price',
+                    'offers.expiration_time',
+                    'offers.status',
+                    'offers.branch_id',
+                    'offers.created_at',
+                    'branches.branch_name',
+                    'branches.store_address',
+                    'branches.lat as branch_lat',
+                    'branches.long as branch_long',
+                    'branches.vendor_id',
+                    'vendors.id as vendor_id_fk',
+                    'vendors.business_name',
+                    'vendors.logo',
+                    'vendors.vendor_type'
+                )
+                ->join('branches', 'offers.branch_id', '=', 'branches.id')
+                ->join('vendors', 'branches.vendor_id', '=', 'vendors.id')
+                ->where('offers.status', 'active')
+                ->where('offers.expiration_time', '>', now());
 
-    } catch (\Exception $e) {
-        return response()->json([
-            'status'      => 'success',
-            'data'        => offer::where('status', 'active')->where('expiration_time', '>', now())->latest()->take(10)->get(),
-            'debug_error' => $e->getMessage()
-        ]);
+            if ($request->filled('lat') && $request->filled('long')) {
+                $lat = (float) $request->lat;
+                $lon = (float) $request->long;
+
+                $distanceSql = "(6371 * acos(cos(radians(?)) * cos(radians(branches.lat)) * cos(radians(branches.long) - radians(?)) + sin(radians(?)) * sin(radians(branches.lat))))";
+
+                $query->addSelect(\DB::raw("$distanceSql AS distance"))
+                    ->addBinding([$lat, $lon, $lat], 'select');
+
+                $scoreSql = "CASE WHEN vendors.vendor_type = ? THEN 15 ELSE 0 END - LEAST($distanceSql * 1.5, 10)";
+
+                $query->addSelect(\DB::raw("($scoreSql) AS recommendation_score"))
+                    ->addBinding([$favoriteType ?? 'none', $lat, $lon, $lat], 'select')
+                    ->orderBy('recommendation_score', 'desc');
+
+            } else {
+                if ($favoriteType) {
+                    $query->orderByRaw("CASE WHEN vendors.vendor_type = ? THEN 0 ELSE 1 END", [$favoriteType])
+                        ->orderBy('offers.expiration_time', 'asc');
+                } else {
+                    $query->orderBy('offers.expiration_time', 'asc');
+                }
+            }
+
+            $recommendedOffers = $query->take(10)->get();
+
+            $recommendedOffers->transform(function ($offer) {
+                $offer->branch = (object) [
+                    'id' => $offer->branch_id,
+                    'branch_name' => $offer->branch_name,
+                    'store_address' => $offer->store_address,
+                    'lat' => $offer->branch_lat,
+                    'long' => $offer->branch_long,
+                    'vendor_id' => $offer->vendor_id,
+                    'vendor' => (object) [
+                        'id' => $offer->vendor_id_fk,
+                        'business_name' => $offer->business_name,
+                        'logo' => $offer->logo,
+                        'vendor_type' => $offer->vendor_type,
+                    ],
+                ];
+
+                unset(
+                    $offer->branch_name,
+                    $offer->store_address,
+                    $offer->branch_lat,
+                    $offer->branch_long,
+                    $offer->vendor_id,
+                    $offer->vendor_id_fk,
+                    $offer->business_name,
+                    $offer->logo,
+                    $offer->vendor_type
+                );
+
+                return $offer;
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Smart personalized recommendations fetched successfully',
+                'detected_favorite_category' => $favoriteType ?? 'No history yet (New User)',
+                'data' => $recommendedOffers
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'success',
+                'data' => offer::where('status', 'active')->where('expiration_time', '>', now())->latest()->take(10)->get(),
+                'debug_error' => $e->getMessage()
+            ]);
+        }
     }
-}
     public function store(Request $request)
     {
         try {
